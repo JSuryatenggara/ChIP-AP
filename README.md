@@ -215,7 +215,7 @@ In each of these entry fields, user may key in the flag arguments as they are wr
 <p align="center">
 <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/chipap_workflow_guide.png>
 </p>
-<b>For detailed explanations of all the steps and methodologies used throughout ChIP-AP refer to our documentation (https://github.com/JSuryatenggara/ChIP-AP/wiki/ChIP-AP-Guide)</b>
+<b>For detailed explanations of all the steps and methodologies used throughout ChIP-AP refer to our [documentation] (https://github.com/JSuryatenggara/ChIP-AP/wiki/ChIP-AP-Guide)</b>
 <br>
 
 
@@ -467,7 +467,7 @@ Below is an example of setting table file in its default-setting state:
 | <b>program</b> | <b>argument</b> |
 |-|-|
 | <b>fastqc1 | -q |
-| <b>clumpify | dedupe spany addcount |
+| <b>clumpify | dedupe spany addcount qout=33 fixjunk |
 | <b>bbduk | ktrim=l hdist=2 |
 | <b>trimmomatic | LEADING:20 SLIDINGWINDOW:4:20 TRAILING:20 MINLEN:20 |
 | <b>fastqc2 | -q |
