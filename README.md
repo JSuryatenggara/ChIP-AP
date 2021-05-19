@@ -215,7 +215,7 @@ In each of these entry fields, user may key in the flag arguments as they are wr
 <p align="center">
 <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/chipap_workflow_guide.png>
 </p>
-**For detailed explanations of all the steps and methodologies used throughout ChIP-AP refer to our [documentation](https://github.com/JSuryatenggara/ChIP-AP/wiki/ChIP-AP-Guide)**
+<b>For detailed explanations of all the steps and methodologies used throughout ChIP-AP refer to our documentation (https://github.com/JSuryatenggara/ChIP-AP/wiki/ChIP-AP-Guide)</b>
 <br>
 
 
