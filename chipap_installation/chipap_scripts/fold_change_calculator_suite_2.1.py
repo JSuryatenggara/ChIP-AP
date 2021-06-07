@@ -257,7 +257,7 @@ parser.add_argument('--ctrl_bam',
                     required = True)
 
 parser.add_argument('--normfactor', 
-                    help = '<Optional> Assign the factor to use for read counts normalization', 
+                    help = '<Required> Assign the factor to use for read counts normalization', 
                     choices = ['mapped', 'uniquely_mapped', 'user_value'])
 
 parser.add_argument('--chip_norm', 
