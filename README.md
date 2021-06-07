@@ -467,7 +467,7 @@ Below is an example of setting table file in its default-setting state:
 | <b>program</b> | <b>argument</b> |
 |-|-|
 | <b>fastqc1 | -q |
-| <b>clumpify | dedupe spany addcount |
+| <b>clumpify | dedupe spany addcount qout=33 fixjunk |
 | <b>bbduk | ktrim=l hdist=2 |
 | <b>trimmomatic | LEADING:20 SLIDINGWINDOW:4:20 TRAILING:20 MINLEN:20 |
 | <b>fastqc2 | -q |
