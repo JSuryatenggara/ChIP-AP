@@ -1,6 +1,5 @@
-# ChIP-AP Outputs
-
 ## ChIP-AP Graphical Overview
+
 <p align="center">
 <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_1.png>
 </p>

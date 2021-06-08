@@ -1,5 +1,5 @@
-# ChIP-AP
-## Windows Installation Guide v1
+## ChIP-AP Setup Guide for Windows v1
+
 Of all the installation guides we’ve prepared, the Windows guide is by far the longest and most involved with most command line dabbling till set up.  This is because the software used for ChIP-AP was never destined to run on Windows but there is a way around it if you’re tech savy enough.  Fortunately for you, we think we are 😉 
 
 This installation guide was performed on a Windows 10 installation running v20H2, although will work with v1903 or later (Homer or Professional). Basically, as long as you have access to install the Linux Subsystem you will be fine.  Older versions of Windows, like Windows 7/8, are not compatible. For this installation, you will need administrator access to your machine to install and make modifications as well as an active Microsoft Store Account. If you are setting it up on your own personal laptop, this should be fine as it’s your usual login password.  If this is a computer owned/maintained by your institute’s IT department, you will either need them to set it up for you or give you temporary administrator access to set it up (which they can if they are nice).

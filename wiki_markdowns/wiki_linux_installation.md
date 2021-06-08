@@ -1,5 +1,5 @@
-# ChIP-AP
-## Linux Installation Guide v1
+## ChIP-AP Setup Guide for Linux v1
+
 This installation guide was performed on the Ubuntu VM provided for your use (i.e., if you use the provided VM, this is how it was set up). Other Ubuntu based variants may require some slight modifications to certain steps (as some base dependencies might differ between variants), so keep that in mind. Unfortunately, it is impossible for us to make a guide for every variant out there. Also, some installations steps might have issues depending on your current system setup and configuration. This  installation guide was done on a fresh install of Ubuntu 20.04 LTS but we have tested it on the 16.04 and 18.0x LTS versions as well. To resolve any issues that may arise, Google (not Bing, sorry Microsoft) and Stack Exchange are your best friends really, so look online and you should be able to find a solution that works for you.
 
 A point of note: Ideally, for you to install ChIP-AP you need to have administrator access to install the required files (so this is if it’s your own personal laptop, this is the ideal situation). It is possible to install in shared computing

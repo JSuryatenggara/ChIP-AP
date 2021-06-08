@@ -1,4 +1,3 @@
-# ChIP-AP
 ## Virtual Machine Setup and Usage Guide v1
 
 Sometimes, individuals don’t want to corrupt or change their pre-configured systems with new software. For such scenarios, setting up a virtual machine (VM) as a test environment is perfect as it allows the user to setup an environment completely independent of their main operating setup.  The down-side to such a setup however, is the additional hardware requirements to run a 2nd VM on top of an existing system.  This arrangement is also ideal on a shared lab computer where users can run their ChIP-Seq analysis in the VM and then deactivate it when done, such that only a single high-powered computer is required per lab, rather than using shared resources or providing high-powered computer hardware to all users.

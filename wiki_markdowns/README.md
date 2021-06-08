@@ -1,4 +1,3 @@
-# ChIP-AP
 <p align="center">
 <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/ChIP-AP_logo.png>
 </p>
@@ -574,6 +573,6 @@ There are a couple of things to look for to answer this question. 1, the fingerp
     
         For processing our ChIP-Seq analysis, we utilized ChIP-AP (REF). Raw fq files are uploaded to GEO with accession number XXXXX, and the custom settings table utilized for analysis can be found on GEO as a processed settings file and also in supplemental table XX in our manuscript. Full details of ChIP-AP and its function can be found in its corresponding manscruipt (REF).
 
-<b>We have a Q&A section located as a wiki page with frequently asked questions and answers. This list will be updated as we receive more questions to advise the wider community.</b>
 <br>
 
+<b>We have a Q&A section located as a wiki page with frequently asked questions and answers. This list will be updated as we receive more questions to advise the wider community.</b>

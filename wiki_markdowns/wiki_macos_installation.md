@@ -1,5 +1,5 @@
-# ChIP-AP
-## MacOS Installation Guide v1
+## ChIP-AP Setup Guide for MacOS v1
+
 This installation guide was performed on MacOS Catalina (10.15.7) but should be compatible with all versions 10.15 (Catalina) and later. Please note you will need administrator installation access for this installation, there is no way around that for macOS installations unfortunately. If this is your personal computer/laptop, this is just the password you use for any installation/login as normal. In the following tutorial, we will ignore any steps where you are asked for your password (as it may/will appear multiple times), when it does appear just enter the password and continue with the remainder of the instructions.
 
 Additionally, you need to make sure your Mac is running an Intel processor. ChIP-AP will not currently run on the new Apple Silicon (AS) chips (such as the M1 or later). This is because the underlying software running ChIP-AP hasn’t been updated yet for AS chips as per our understanding. Apple’s Rosetta 2 might be able to run ChIP-AP but we cannot guarantee that it will do so flawlessly or produce consistent results, so we use the blanket statement of “it won’t run” to avoid ambiguity till we can be confident in its running (also we don’t have an M1 Mac to test it

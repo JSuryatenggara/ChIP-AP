@@ -1,5 +1,3 @@
-# ChIP-AP
-
 <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/ChIP-AP_logo.png>
 
 This documentation is available as a pdf [here](https://github.com/JSuryatenggara/ChIP-AP/blob/main/New/ChIP-AP_documentation.pdf).
