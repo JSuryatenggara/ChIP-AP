@@ -1,4 +1,4 @@
-<img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/ChIP-AP_logo.png>
+<img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/ChIP-AP_logo.png>
 
 Welcome to the ChIP-AP wiki!
 

@@ -30,23 +30,23 @@ By its nature, running a 2nd OS through virtualization will demand very capable 
 
 1. Oracle’s VirtualBox can be downloaded from https://www.virtualbox.org/ (a).  Make sure you download the correct installer for your host OS (b).
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_1.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_1.PNG>
     
 <br>
 
 2. Once the installer is downloaded, run it.
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_2.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_2.PNG>
     
 <br>
 
 3. Proceed through the installation accepting default unless you want to change the installation directory (*).
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_3.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_3.PNG>
     
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_4.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_4.PNG>
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_5.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_5.PNG>
     
 <br>
 
@@ -59,20 +59,20 @@ By its nature, running a 2nd OS through virtualization will demand very capable 
 1. Once you start VirtualBox, the base screen will appear.
     At this stage, download the pre-configured Linux guest VM image from our dropbox https://www.dropbox.com/s/4d3adb6ckof5rti/ChIP-AP_Ubuntu_LTS2004.vhd (100Gb download)
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_6.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_6.PNG>
     
 <br>
 
 2. Next, you need to make a new virtual machine container.  To do this click on “New” (a). 
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_7.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_7.PNG>
     
 <br>
 
 3. This will bring up the new configuration menu.  
 Name the image anything you want (b) – in our case we called it (ChIP-AP_Ubuntu_LTS2004). 
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_8.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_8.PNG>
     
     For “Machine Folder,” this is where you want all the files associated with the image are to be saved (c).  Therefore, make sure this is on a drive that is large enough to contain all required files (~150Gb to be safe).
 
@@ -82,14 +82,14 @@ Name the image anything you want (b) – in our case we called it (ChIP-AP_Ubunt
 
 4. On the next screen, you will need to set the ram requirements for the guest OS.  For this we recommend as much as possible but as a minimum, 10Gb should be ok (1024 * 10 = 10240 MB).
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_9.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_9.PNG>
     
 <br>
 
 5. On the next screen, you need to select what the HDD for the image will be. Select “Use existing virtual hard disk file.” This is the VM image downloaded above from our dropbox, so select that from the appropriate menu. 
 Once selected, click on “Create”
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_10.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_10.PNG>
     
     You will be taken to the main VirtualBox screen with the new machine showing up in the far left column.
 
@@ -97,37 +97,37 @@ Once selected, click on “Create”
 
 6. Next, we need to configure more regarding the available resources for the VM.  So, select the newly created machine on the left (a) and then click “Settings” at the top (b). 
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_11.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_11.PNG>
     
 <br>
 
 7. In the setting dialog box, click “General” (a) and then click on “Advanced” (b).  Make sure that “Shared Clipboard” and “Drag’n’Drop” are both set to “Bidrectional” (c). 
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_12.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_12.PNG>
     
 <br>
 
 8. Under “System” (a), select the “Processor” tab (b) and then set your processor count to (recommended) half the number of processors available (c). The more cores you give the guest OS the faster you can get ChIP-AP to run, but this comes at a cost of slowing your host OS.  NEVER set this number to all available cores in your system, the max should always be 1 less than the max available – this is to maintain system stability under load.
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_13.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_13.PNG>
     
 <br>
 
 9. Under “Display” (a), set the “Video Memory” to 128 MB (b).
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_14.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_14.PNG>
     
 <br>
 
 10. This next step is critical to get right otherwise you will not be able to share information between the guest and the host OS.  On the “Shared Folder” tab (a), click the “New” icon (b).
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_15.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_15.PNG>
     
 <br>
 
 11. On the Edit Share window that appears:
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_16.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_16.PNG>
     
     ... the “Folder Path” selection (a) is the folder on your HOST OS that you wish to be visible to the guest OS, so select whichever folder you want. For example:
 
@@ -152,7 +152,7 @@ Once selected, click on “Create”
 12. Now that all the VM is configured you can start the VM.
     Depending on the speed of your system, this can take a short/long time.  On our setup, the VM start up takes ~20-30 seconds.
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_17.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_17.PNG>
     
 <br>
 
@@ -163,41 +163,41 @@ The username for the pre-configured VM is: chip-ap_user
 The password for the pre-configured VM is: chip-ap
 1. Once started, the ChIP-AP VM desktop will appear
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_18.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_18.PNG>
     
 <br>
 
 2. As a quick tour, if you click “Files” in the top left (a) 
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_19.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_19.PNG>
     
     In the Nautilus window that appears (this is the equivalent of Windows Explorer or Finder), you will find the bookmarked “to_vm” folder on the left, this is where you will find your shared folder between the guest and host OS’es.
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_20.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_20.PNG>
     
 <br>
 
 3. To run ChIP-AP, go to the “Terminal” in the top left of the desktop again. 
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_21.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_21.PNG>
     
 <br>
 
 4. In the terminal window that appears…
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_22.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_22.PNG>
     
     Before running anything, you need to activate the configured conda environment by typing:
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_23.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_23.PNG>
         
     Next, depending on what you want to do, you can run ChIP-AP in 1 of 3 ways, there is the GUI Wizard
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_24.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_24.PNG>
 
     Or the GUI dashboard
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/VM/VM_25.PNG>
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/VM/VM_25.PNG>
 
     Or if you want to go all out with the command line, you can use the command option (chipap_v4.1.py) providing all the necessary input parameters and run it that way.  For full details about all the command line parameters and functions of everything, please refer to the documentation located on our github (https://github.com/JSuryatenggara/ChIP-AP).
 

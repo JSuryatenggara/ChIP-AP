@@ -2,7 +2,7 @@
 
 ## ChIP-AP Graphical Overview
 <p align="center">
-<img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_1.png>
+<img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_1.png>
 </p>
 
 <br>
@@ -16,7 +16,7 @@
 
     **How does it look like?** After this step is done (which is the end of your ChIP-AP processes if you don’t use the “--run” flag to run the pipeline immediately), you can see within your designated output directory a single folder named as per your “--setname” input, with contents as shown below regardless of single-end or paired end-mode:  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_2.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_2.PNG>  
 
     The left figure shows a dataset with narrow peak type, while the right figure shows a dataset with broad peak type. Note that the peak calling module – folder number 12 – is interchangeable between GEM for narrow peak type and SICER2 for broad peaks. This is because of the significant difference between these 2 peak callers in handling the respective datasets. GEM does a great job for TF’s and SICER2 for broad peaks.  
 
@@ -24,11 +24,11 @@
 
 4. **Copying, compressing, and renaming of the raw sequencing reads**. In the very beginning, ChIP-AP makes (in the user-designated output folder) a copy of each unaligned sequence reads file, compresses them into a gunzipped file (if not already), and renames them with the prepared new name from step “**2. Sample recognition and registration**”. If the given inputs are aligned reads (bam files), the pipeline starts at step “**12. Sorting and indexing of aligned reads file**s” (see below) and the copying and renaming are taken over by **08_results_script.sh** where the original bam files are directly sorted and the pipeline proceeds normally from there.  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_2.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_2.PNG>  
 
     **How does it look like?** After **00_raw_data_script.sh** had been executed, all reads files in your dataset will have been copied into this folder: **00_raw_data**, compressed into **fq.gz**, and renamed into something like the preview below, regardless of your initial filenames, fastq formatting or extensions.  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_3.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_3.PNG>  
 
     The left figure shows a single-end dataset with four ChIP samples and three control samples. The right figure shows a paired-end dataset with two ChIP samples and two control samples, in which every sample consists of two files: the first read (R1), and the second read (R2).  
 
@@ -36,11 +36,11 @@
 
 5. **Raw sequencing reads quality assessment**. Performed by FastQC. Reads quality assessment is performed to check for duplicates, adapter sequences, base call scores, etc. Assessment results are saved as reports for user viewing. If the final results are not as expected, it’s worthwhile to go through the multiple QC steps and track the quality of the data as its processed from this folder onwards. If the default QC steps aren’t cleaning up the data adequately, you may need to modify some parameters to be more/less stringent with cleanup. From our testing, our default values seem to do a fairly adequate job though for most datasets. They even work pretty well for RNA-Seq and RIP-Seq datasets too!  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_3.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_3.PNG>  
 
    **How does it look like?** After **01_raw_reads_quality_control_script.sh** had been executed, the folder: **01_raw_reads_quality_control** will contain all these quality assessment reports for every raw reads file in folder **00_raw_data**, just like below:  
     
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_4.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_4.PNG>  
 
     The left figure shows a single-end dataset with four ChIP samples and three control samples. The right figure shows a paired-end dataset with two ChIP samples and two control samples, in which every sample consists of two files: the first read (R1), and the second read (R2).  
 
@@ -48,11 +48,11 @@
 
 6. **Deduplication of reads**. Performed by clumpify from BBMap package. Clumpify is used to remove optical duplicates and tile-edge duplicates from the reads file in addition to PCR duplicates. This step is performed in preference to a PCR deduplication step downstream. Optimization of file compression is also performed by clumpify during deduplication process, in order to minimize storage space and speed up reads file processing. Clumpify will also ensure your processed files are output in PHRED33 format so as to not break any down-stream program processing. Also, if there are ill-formatted reads (if using publicly available dataset) then Clumpify will also attempt to fix these reads.  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_4.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_4.PNG>  
 
     **How does it look like?** After **02_deduplicating_script.sh** had been executed, the folder: **02_deduplicating** will contain all these deduplicated reads files (marked by the extension: **.deduped.fq.gz**), just like below:  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_5.PNG>   
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_5.PNG>   
 
     The left figure shows a single-end dataset with four ChIP samples and three control samples. The right figure shows a paired-end dataset with two ChIP samples and two control samples, in which every sample consists of two files: the first read (R1), and the second read (R2).  
 
@@ -60,11 +60,11 @@
 
 7. **Adapter trimming of reads**. Performed by BBDuk from BBMap package. BBDuk scans every read for adapter sequences in its reference list of adapter sequences. The standard BBDuk adapter sequence reference list **‘adapter.fa’** is used as the default in the pipeline. Any sequencing adapter present in the reads is removed. Custom adapter sequence can be used whenever necessary by modifying the adapter.fa file and adding your new sequences. Just remember to make a backup of the original yeah? We warned you!  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_5.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_5.PNG>  
 
     **How does it look like?** After **03_adapter_trimming_script.sh** had been executed, the folder: **03_adapter_trimming** will contain all these adapter-trimmed reads files (marked by the extension: **.adaptertrimmed.fq.gz**), just like below:  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_6.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_6.PNG>  
 
     The left figure shows a single-end dataset with four ChIP samples and three control samples. The right figure shows a paired-end dataset with two ChIP samples and two control samples, in which every sample consists of two files: the first read (R1), and the second read (R2).  
 
@@ -72,11 +72,11 @@
 
 8. **Quality trimming of reads**. Performed by Trimmomatic. Trimmomatic scans every read and trims low quality base calls from the ends of the reads. Additionally, it scans with a moving window along the read and cuts the remainder of the read when the average quality of base calls within the scanning window drops below the set threshold. Finally, it discards the entirety of a read of it gets too short post-trimming for alignment to reference genome, minimizing the chance of reads being multi-mapped to multiple genomic locations. Check out the settings table for the parameters used. Some value changes won’t make a big difference to the output, some will make a huge difference, so careful what you set this to.  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_6.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_6.PNG>  
 
     **How does it look like?** After **04_quality_trimming_script.sh** had been executed, the folder: **04_quality_trimming** will contain all these quality-trimmed reads files (marked by the extension: **.qualitytrimmed.fq.gz**), just like below:  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_7.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_7.PNG>  
 
     The left figure shows a single-end dataset with four ChIP samples and three control samples. The right figure shows a paired-end dataset with two ChIP samples and two control samples, in which every sample consists of two files: the first read (R1), and the second read (R2).  
 
@@ -84,11 +84,11 @@
 
 9. **Pre-processed reads quality assessment**. Performed by FastQC. Quality assessment is performed to check for the efficiency of cleanup. Results are saved as reports.  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_7.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_7.PNG>  
 
     **How does it look like?** After **05_preprocessed_reads_quality_control_script.sh** had been executed, the folder: **05_preprocessed_reads_quality_control** will contain all these quality assessment reports for every **qualitytrimmed.fq.gz** file in folder **04_quality_trimming**, just like below:  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_8.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_8.PNG>  
 
     The left figure shows a single-end dataset with four ChIP samples and three control samples. The right figure shows a paired-end dataset with two ChIP samples and two control samples, in which every sample consists of two files: the first read (R1), and the second read (R2).  
 
@@ -96,11 +96,11 @@
 
 10. Reads alignment to reference genome. Performed by the mem algorithm in BWA aligner. The appropriate genome reference for the sample is given as a command line argument. The default genome reference is hg38. Precomputed genome references for hg38, hg19, mm9, mm10, dm6, and sacCer3 are downloaded as part of the ChIP-AP installation process. Tutorials for custom / different genome references can be found on the ChIP-AP GitHub (coming soon!). BWA is used in preference to other aligners such as Bowtie2 as in benchmarking papers (Thankaswamy-Kosalai et al., 2017), we were more satisfied with the results of BWA, hence its inclusion in this pipeline.  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_8.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_8.PNG>  
 
     **How does it look like?** After **06_bwa_mem_aligning_script.sh** had been executed, the folder: **06_bwa_mem_aligning** will contain all these aligned reads files (marked by the extension: **.aligned.bam**), just like below:  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_9.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_9.PNG>  
 
     The left figure shows a single-end dataset with four ChIP samples and three control samples. The right figure shows a paired-end dataset with two ChIP samples and two control samples. Note that right here the first reads (R1), and the second reads (R2) had both been aligned into the same reference genome, and thus no longer separated in two different files. Paired-end files are processed in pairs by bwa mem.  
 
@@ -108,11 +108,11 @@
 
 11. **Alignment score quality filtering**. Performed by samtools view. This filter (if set) will remove all reads with alignment score (MAPQ) below a user defined threshold. Reads with suboptimal fit into the genome and/or reads with multiple ambiguous mapped locations can easily be excluded from the reads file using this filter step also. To disable MAPQ filtering, simply remove all flags from the settings table for this step. As for what is an appropriate filter to set? There are many blog posts by bioinformaticians talking about MAPQ inconsistency and what the scores mean, so that discussion is a long one to have. Basically, we have 2 takes on the matter, if you want to include everything, then remove the parameters for this step from the settings table. If you want to be relatively stringent then use the default MAPQ filter of 20.  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_9.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_9.PNG>  
 
     **How does it look like**? After **07_MAPQ_filtering_script.sh** had been executed, the folder: **07_MAPQ_filtering** will contain all these MAPQ-filtered reads files (marked by the extension: **.mapqfiltered.bam**), just like below:  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_10.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_10.PNG>  
 
     The left figure shows a single-end dataset with four ChIP samples and three control samples. The right figure shows a paired-end dataset with two ChIP samples and two control samples. Again, note that right here the first reads (R1), and the second reads (R2) had both been aligned into the same reference genome by bwa mem in above, and thus no longer separated in two different files.  
 
@@ -120,23 +120,23 @@
 
 12. **Sorting and indexing of aligned reads files.** Performed by samtools sort and samtools index, which do nothing to the aligned reads files other than sorting and indexing, priming the aligned reads files for further processing.  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_10.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_10.PNG>  
 
     **How does it look like?** Detailed output preview of step 12, 13, and 14 are combined below step 14  
 
 13. **ChIP pulldown efficiency assessment.** Performed by plotFingerprint from the deeptools package, which generates fingerprint plots. These serve as a quality control figure that shows DNA pulldown efficiency of the ChIP experiment. Refer to the appropriate documentation for full details but in short – the input should be as close to the 1:1 diagonal as possible and the better enrichment seen in your sample, the more its curve will bend towards the bottom right. You want (ideally) a large gap between the chip and the control samples. PNG files are provided for easy viewing, SVG files provided if you want to make HQ versions later for publication.  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_11.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_11.PNG>  
 
     **How does it look like?** Detailed output preview of step 12, 13, and 14 are combined below step 14  
 
 14. **Visualization track generation of aligned reads files**. Performed by bamCoverage from the deeptools package. Generates bigwig files for quick and simple visualization of reads distribution along the referenced genome using local tools such as IGV. The Coverage tracks can be uploaded to genome browsers such as UCSC or a track hub needs to be generated and uploaded to a publicly accessible server. This is not something ChIP-AP does at this stage (and frankly we don’t want to do this unless there’s a huge demand from the public to automate this). If you’re running ChIP-AP on your computer then just view it locally. But I want to share the results with colleagues and just give them the UCSC link.... Oh, look a cricket!!!  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_12.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_12.PNG>  
 
     **How does it look like?** After **08_results_script.sh** had been executed, the folder: **08_results** will contain all these sorted reads files (marked by the extension: **.bam**), a couple merged sorted reads files\* (marked by the extension: **_merged.bam**), indices to all the sorted reads files (marked by the extension: **.bam.bai**), the same sorted reads files re-sorted by name (marked by the extension: **namesorted.bam**), bigwig files of all the sorted reads files (marked by the extension: **.bw**), fingerprint plot files of all the sorted reads files (in its own folder: **fingerprint_plots**), and all the log files from all the program calls by **08_results_script.sh**.  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_11.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_11.PNG>  
 
     The left figure shows a single-end dataset with four ChIP samples and three control samples. The right figure shows a paired-end dataset with two ChIP samples and two control samples. There should be one sorted reads file here for each processed MAPQ-filtered reads file from folder **07_MAPQ_filtering**; a merged ChIP and a merged control reads files\*; one index file for each sorted reads file in this folder; one name-sorted reads file for each sorted reads file in this folder\*\*; one bigwig file for each sorted reads file in this folder; two fingerprint plot files in the **fingerprint_plots** folder (in extension: **.png** and **.svg**); and another two fingerprint plot files in the **fingerprint_plots** folder (in extension: **.png** and **.svg**)\*\*\*.  
 
@@ -148,11 +148,11 @@
 
 15. **Aligned reads quality assessment**. Processed by FastQC. Quality assessment is performed to check for the alignment efficiency, such as how many reads failed to be mapped. Assessment results are saved as reports.  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_13.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_13.PNG>  
 
     **How does it look like?** After **09_aligned_reads_quality_control_script.sh** had been executed, the folder: **09_aligned_reads_quality_control** will contain all these quality assessment reports for every **.bam** file in folder **08_results**, just like below:  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_12.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_12.PNG>  
 
     The left figure shows a single-end dataset with four ChIP samples and three control samples. The right figure shows a paired-end dataset with two ChIP samples and two control samples.  
 
@@ -164,11 +164,11 @@ For Broad Peaks (Histone Marks) - Performed by MACS2 (broad setting), SICER2, HO
 The same track of aligned reads is scanned for potential protein-DNA binding sites.The process returns a list of enriched regions in various formats.  
     
     <b>MACS</b>  
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_14.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_14.PNG>  
 
     **How does it look like?** After **11_macs2_peak_calling_script.sh** had been executed, the folder: **11_macs2_peak_calling** will contain all these files, just like below:  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_13.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_13.PNG>  
 
     For some reason, MACS2 does not generate the statistical model of the dataset’s background noise (**.r**) in paired-end mode (right figure).  
 
@@ -190,11 +190,11 @@ The same track of aligned reads is scanned for potential protein-DNA binding sit
 
     <br>
     <b>GEM</b>
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_15.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_15.PNG>  
 
     **How does it look like?** After **12_gem_peak_calling_script.sh** had been executed, the folder: **12_gem_peak_calling** will contain all these files, just like below:  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_14.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_14.PNG>  
 
     GEM outputs both the binding event files and the motif files. Because of the read distribution re-estimation, GEM outputs event prediction and read distribution files for multiple rounds. All of these are in saved in folder **[setname]_GEM_outputs**. However, as long as ChIP-AP is concerned, we are only interested in GEM’s final output files, which are saved outside the said folder. Each of these has their own exclusive information. GEM is actually a suite consisting of multiple modules performing their specific tasks. The GPS module is the one that detects peaks based on reads distribution (similar to most peak callers). The resulting peak list from solely running this GPS module can be viewed in file **[setname]_GEM_GPS_events.txt**.  
 
@@ -219,11 +219,11 @@ The same track of aligned reads is scanned for potential protein-DNA binding sit
 
     <br>
     <b>SICER2</b>
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_16.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_16.PNG>  
 
     **How does it look like?** After **12_sicer2_peak_calling_script.sh** had been executed, the folder: **12_sicer2_peak_calling** will contain all these files, just like below:  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_15.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_15.PNG>
 
     SICER2 generates multiple output files as follows:  
 
@@ -236,11 +236,11 @@ The same track of aligned reads is scanned for potential protein-DNA binding sit
 
     <br>
     <b>HOMER</b>  
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_17.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_17.PNG>  
 
     **How does it look like?** After **13_homer_peak_calling_script.sh** had been executed, the folder: **13_homer_peak_calling** will contain all these files, just like below:  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_16.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_16.PNG>  
 
     There is no output files difference between single-end and paired-end mode.  
     
@@ -266,11 +266,11 @@ The same track of aligned reads is scanned for potential protein-DNA binding sit
 
     <br>
     <b>Genrich</b>
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_18.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_18.PNG>  
 
     **How does it look like**? After **14_genrich_peak_calling_script.sh** had executed, the folder: **14_genrich_peak_calling** will contain all these files, just like below:  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_17.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_17.PNG>  
 
     There is no output files difference between single-end and paired-end mode.  
 
@@ -289,11 +289,11 @@ The same track of aligned reads is scanned for potential protein-DNA binding sit
 
 17. **Peaks merging**. Performed by a custom script and HOMER’s mergePeaks. The custom script reformats necessary peak caller outputs into HOMER region list format. mergePeaks looks for overlaps between the regions in the four peak caller outputs and lists the merged regions in multiple files based on the peak caller(s) that calls them. These multiple files are then concatenated together into a single regions list file.  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_19.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_19.PNG>  
 
     **How does it look like?** After **21_peaks_merging_script.sh** had executed, the folder: **21_peaks_merging** will contain all these files, just like below:  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_18.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_18.PNG>  
 
     There is no output files difference between single-end and paired-end mode. Also, you will find SICER2 instead of GEM when running broad peak type datasets.  
     ChIP-AP takes the input files described above, then generates the four tab-separated-values files **MACS2**, **GEM** or **SICER2**, **HOMER**, and **Genrich**, which are lists of peaks detected by their respective peak caller.  
@@ -311,13 +311,13 @@ The same track of aligned reads is scanned for potential protein-DNA binding sit
     <br>
     The resulting multiple <b>21_peaks_merging/[setname]_merged_peaks*</b> files are then concatenated together into a single list file <b>[setname]_all_peaks_concatenated.tsv</b> by <b>22_peaks_processing_script.sh</b> (the subsequent script in the pipeline), and saved in folder <b>22_peaks_processing</b>  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_20.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_20.PNG>  
 
     **How does it look like?** Detailed output preview of this, step 18, 19, and 20 are combined below step 20
 
 18. **Peaks annotation**. Performed by annotatePeaks from HOMER package. Each region in the concatenated list is annotated based on its genomic location for the genome specified. The process returns the same list of regions, with each entry row appended with various information pertaining to the gene name, database IDs, category, and instances of motif (if HOMER known motif matrix file is provided to ChIP-AP), etc.  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_21.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_21.PNG>  
 
     **How does it look like?** Detailed output preview step 18, 19, and 20 are combined
     below step 20  
@@ -328,17 +328,17 @@ The same track of aligned reads is scanned for potential protein-DNA binding sit
 
     In addition, the custom-made script also makes some reformatting and provides additional information necessary for downstream analysis.  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_22.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_22.PNG>  
 
     **How does it look like?** Detailed output preview step 18, 19, and 20 are combined below step 20  
 
 20. **Peak statistics summary**. Performed by a custom script designed for quality assessment of called peaks. Returns a summary text file containing information pertaining to the peak read depth, peak fold enrichment, known motif hits, and positive peak hits (based on known motif presence if a HOMER formatted motif file was included when calling ChIP-AP), in each peak set along the continuum between single peak callers and the absolute consensus of all four peak callers.  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_23.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_23.PNG>  
 
     **How does it look like?** After **22_peaks_processing_script.sh** had executed, the folder: **22_peaks_processing** will contain all these files, just like below:  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_19.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_19.PNG>  
 
     The last segment of step 17 concatenates all the peak caller combinations peak list files into one file: **[setname]_all_peaks_concatenated.tsv**, followed by annotation in step 18 that generates the file: **[setname]_all_peaks_annotated.tsv**, followed by fold change calculation etc. in step 19 that generates the file: **[setname]_all_peaks_calculated.tsv**. Step 20 reads the resulting file **[setname]_all_peaks_calculated.tsv** and generates a statistics summary file **[setname]_peak_caller_combinations_statistics.tsv**.  
 
@@ -402,15 +402,15 @@ The same track of aligned reads is scanned for potential protein-DNA binding sit
 
 21. **(Optional) Downstream analysis: Gene ontology enrichment**. Each peak in the concatenated list is appended with all the gene ontology terms associated with its gene annotation. The gene ontology terms are derived from biological processes, molecular functions, and cellular compartments databases. This enables list filtering based on the gene ontology terms of the study’s interest.  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_24.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_24.PNG>  
 
 22. **(Optional) Downstream analysis: Pathway enrichment**. Each peak in the concatenated list is appended with all the related biological pathways associated with its gene annotation. The biological pathway terms are derived from **KEGG, SMPDB, Biocyc, Reactome, Wikipathways, and pathwayInteractionDB** databases. This enables list filtering based on the biological pathways of the study’s interest. Additionally, this analysis also adds other terms pertaining to known interactions with common proteins and known gene mutations found in malignant cases, derived from **common protein interaction and COSMIC** databases, respectively.  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_box_25.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_25.PNG>  
 
     **How does it look like?** After **23_go_annotation_script.sh** had executed, the folder: **23_supplementary_annotations** will contain all these files, just like below:  
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_20.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_20.PNG>  
 
     There is no output files difference between single-end and paired-end mode.  
 
@@ -456,7 +456,7 @@ Sometimes, unlike what the file or channel name suggests, you might find errors 
 
 The example contents inside folder /logs can be seen below:  
 
-<img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/Output/output_21.PNG>  
+<img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_21.PNG>  
 
 All these outputs are recorded for your convenience in troubleshooting and error reporting. Do open and read these files to see what’s happening with your program. After you spot the potential problem, you can either post the logged error message in our GitHub - issues (https://github.com/JSuryatenggara/ChIP-AP/issues), or go hit Google search if you think the problem is simple and quick enough to figure out yourself.
 
@@ -822,7 +822,7 @@ There are a couple of things to look for to answer this question. 1, the fingerp
 
     The fingerprint plot tells us how well the enrichment of your samples worked. It is generated by the function from the deeptools package and is generated after the alignment files. As such, the plots are found in the “08_results” folder and are labelled “fingerprint_xxxxx.png/svg.” The PNG files allow you to view them in any image viewer, the SVG files are for opening in Adobe Illustrator or Inkscape to make HQ publication figures later if you need.  
 
-    <img src="https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/fingerprint_plot_guide.png" width="800">  
+    <img src="https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/fingerprint_plot_guide.png" width="800">  
 
     To interpret the fingerprint plot, (more information can be found on the deeptools documentation site), but  put simply, the input control should be a diagonal line as close as possible toward the 1:1 diagonal. Your ChIP sample should have a bend/kink towards the bottom right corner. The greater the separation between the input and the chip sample, the greater the enrichment you will see in the final result (i.e., lots of peaks). If the lines are overlapping, then you will see little enrichment and your experiment didn’t work that well. If you’re sample lines are switched – then you probably switched the sample names and we recommend doing the right thing and repeating the experiment and not simply switch sample names for the sake of a publication.
 
@@ -833,7 +833,7 @@ There are a couple of things to look for to answer this question. 1, the fingerp
 
     In the folder “21_peaks_merging” folder, you will find the “venn.txt” file. This will show you a textual venn diagram of the overlap between the called peaks across all peak callers. To know your experiment worked well, then you should see a full list with combinations of all peak callers and relatively large numbers for the consensus peak sets (ie peaks called by multiple peak callers) – this is the ideal case. However, from our experiences, there will almost always be 1 maybe 2 peak callers that don’t like a dataset for some reason and so you may find a peak caller performed poorly but the others performed admirably. This is still a good and valid result.  
 
-    <img src="https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/venn_diagram_guide.png" width="800">  
+    <img src="https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/venn_diagram_guide.png" width="800">  
 
     If you look at this file and only see a small number of peaks and little overlap, and only 1 peak caller seems to have dominated peak calling, then likely your experiment didn’t work that great. Just because only 1 peak caller performed well though, doesn’t mean the experiment is a write-off and a failure. It can still be valid and so doings some manual validations on the top FC differential peaks by chip-PCR might give you an indication whether there is salvageable data or not. Also if you have other confirmatory experimental evidence then even 1 peak calling getting results is fine. This is why we implemented multiple peak callers, because there are many instances where the signal:noise just creates a mess for most peak callers but generally 1 will be the super-hero of the day in such a situation.
 
@@ -843,11 +843,11 @@ There are a couple of things to look for to answer this question. 1, the fingerp
 
     Open a new blank workbook in excel  
 
-    <img src="https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/excel_screenshot_1_guide.png" width="800">  
+    <img src="https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/excel_screenshot_1_guide.png" width="800">  
 
     In the ribbon at the top, go to “Data”, then select “From Text/CSV”
 
-    <img src="https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/images/excel_screenshot_2_guide.png" width="800">  
+    <img src="https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/excel_screenshot_2_guide.png" width="800">  
 
     In the dialog box that opens up, find and open the peaks files “xxxx_all_peaks_calculated.tsv.” Follow all the prompts and keep pressing “Next” / “Proceed” till the end and the file opens. Opening the peak file this way circumvents an issue that Excel constantly makes which is it will interpret some gene names such as OCT1 as a date, when its not. So by following the aforementioned steps, excel will not do this stupid conversion and instead, when you save the file as an xlsx, it will ensure that this issue doesn’t happen (seen it in sooooo many publications its not funny – just import data this way please people?)  
 
