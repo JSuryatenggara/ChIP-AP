@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 #pyright: reportUnboundVariable=false
 
+
+# script_version = '1.0'
+
+
 # Usage: ./Genrich  -t <file>  -o <file>  [optional arguments]
 # Required arguments:
 #   -t  <file>       Input SAM/BAM file(s) for experimental sample(s)

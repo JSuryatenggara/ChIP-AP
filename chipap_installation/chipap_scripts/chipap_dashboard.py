@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 #pyright: reportUnboundVariable=false
 
+
+# script_version = '2.0'
+
+
 import tkinter as tk
 import tkinter.font as tkFont
 from tkinter import filedialog
@@ -8,25 +12,22 @@ from tkinter import ttk
 import os
 import multiprocessing
 import subprocess
-import time
-from pathlib import Path
-# try:
-#     import pandas as pd
-# except ImportError:
-#     print("Dependency missing, downloading and installing now")
-#     import pip
-#     pip.main(['install', '--user', 'pandas'])
-#     time.sleep(5) # Sleep for 3 seconds
-
 import pandas as pd
+from PIL import Image, ImageTk
+import sys
 
-current_pipeline = 'chipap_v4.1.py'
+
+chipap_program_name = 'chipap.py'
+
+chipap_icon_full_path = os.path.expanduser('{}/ChIP-AP_icon_GUI.png'.format(sys.path[0]))
+chipap_logo_full_path = os.path.expanduser('{}/ChIP-AP_logo_GUI.jpg'.format(sys.path[0]))
 default_current_dir = os.path.expanduser('~')
 genome_folder_full_path = os.path.expanduser('~/genomes')
-setting_table_file_full_path = '{}/default_settings_table'.format(genome_folder_full_path)
+default_setting_table_file_full_path = '{}/default_settings_table.tsv'.format(genome_folder_full_path)
+
 
 root = tk.Tk()
-root.title(current_pipeline)
+root.title(chipap_program_name)
 root.resizable(width = False, height = False)
 
 line_style = ttk.Style()
@@ -34,7 +35,8 @@ line_style.configure("Line.TSeparator", background = 'black')
 
 ttk.Separator(root, style = "Line.TSeparator", orient = tk.VERTICAL).grid(row = 0, column = 15, rowspan = 6, sticky = "ns")
 ttk.Separator(root, style = "Line.TSeparator", orient = tk.VERTICAL).grid(row = 0, column = 10, rowspan = 11, sticky = "ns")
-ttk.Separator(root, style = "Line.TSeparator", orient = tk.VERTICAL).grid(row = 30, column = 10, rowspan = 17, sticky = "ns")
+ttk.Separator(root, style = "Line.TSeparator", orient = tk.VERTICAL).grid(row = 30, column = 6, rowspan = 17, sticky = "ns")
+ttk.Separator(root, style = "Line.TSeparator", orient = tk.VERTICAL).grid(row = 30, column = 12, rowspan = 17, sticky = "ns")
 
 default_font = tkFont.nametofont("TkDefaultFont")
 default_font.configure(family = 'fixed', size = 16)
@@ -44,6 +46,12 @@ text_font.configure(family = 'fixed', size = 16)
 
 fixed_font = tkFont.nametofont("TkFixedFont")
 fixed_font.configure(family = 'fixed', size = 16)
+
+
+root.tk.call('wm', 'iconphoto', root._w, tk.PhotoImage(file = chipap_icon_full_path))
+
+
+argument_dict = {}
 
 valid_extension_list = [".fastq",
                         ".fq",
@@ -67,15 +75,27 @@ suite_program_list = ["fastqc1",
                         "genrich",
                         "homer_mergePeaks",
                         "homer_annotatePeaks",
-                        "fold_change_calculator"]
+                        "fold_change_calculator",
+                        "homer_findMotifsGenome",
+                        "meme_chip"]
 
-genome_ref_options = ["hg38 (Homo sapiens build 38)", 
-                        "hg19 (Homo sapiens build 19)", 
-                        "mm9 (Mus musculus build 9)", 
-                        "mm10 (Mus musculus build 10)", 
-                        "dm6 (Drosophila melanogaster build 6)", 
-                        "sacCer3 (Saccharomyces cerevisiae build 3)",
-                        "other [!!!under construction!!!]"]
+genome_ref_options = ["hg38 (Homo sapiens)", 
+                        "hg19 (Homo sapiens)", 
+                        "mm9 (Mus musculus)", 
+                        "mm10 (Mus musculus)", 
+                        "dm6 (Drosophila melanogaster)", 
+                        "sacCer3 (Saccharomyces cerevisiae)",
+                        "Other [!!!under construction!!!]"]
+
+homer_motif_options = ["None",
+                        "Consensus peak set", 
+                        "Union peak set", 
+                        "Both peak sets"]
+
+meme_motif_options = ["None",
+                        "Consensus peak set", 
+                        "Union peak set", 
+                        "Both peak sets"]
 
 
 ########################################################################################################################
@@ -873,8 +893,18 @@ def check_required_input_function(*args):
     if read_mode_string_var.get() != 'single' and read_mode_string_var.get() != 'paired':
         error_type_B_int_var.set(1)
 
-    if peak_type_string_var.get() != 'narrow' and peak_type_string_var.get() != 'broad':
+    if peak_type_string_var.get() != 'narrow' and peak_type_string_var.get() != 'broad' and peak_type_string_var.get() != 'unsure':
         error_type_B_int_var.set(1)
+
+    if bool(sample_table_string_var.get()):
+        if not os.path.isfile(sample_table_string_var.get()):
+            error_type_B_int_var.set(1)
+
+    if bool(setting_table_string_var.get()):
+        if '[MODIFIED]' in setting_table_string_var.get():
+            pass
+        elif not os.path.isfile(setting_table_string_var.get()):
+            error_type_B_int_var.set(1)
 
     if not bool(genome_ref_string_var.get()):
         error_type_B_int_var.set(1)
@@ -935,7 +965,7 @@ def update_command_line_function(*args):
     else:
         read_mode_arg.set('')
 
-    if peak_type_string_var.get() == 'narrow' or peak_type_string_var.get() == 'broad':
+    if peak_type_string_var.get() == 'narrow' or peak_type_string_var.get() == 'broad' or peak_type_string_var.get() == 'unsure':
         peak_type_arg.set(' --peak {}'.format(peak_type_string_var.get()))
     else:
         peak_type_arg.set('')
@@ -977,6 +1007,16 @@ def update_command_line_function(*args):
     else:
         known_motif_arg.set('')
 
+    if homer_motif_string_var.get() != 'None':
+        homer_motif_arg.set(' --homer_motif {}'.format(homer_motif_string_var.get().split(' ')[0].lower()))
+    elif homer_motif_string_var.get() == 'None':
+        homer_motif_arg.set('')
+
+    if meme_motif_string_var.get() != 'None':
+        meme_motif_arg.set(' --meme_motif {}'.format(meme_motif_string_var.get().split(' ')[0].lower()))
+    elif meme_motif_string_var.get() == 'None':
+        meme_motif_arg.set('')
+        
     if fcmerge_var.get() == 1:
         fcmerge_arg.set(' --fcmerge')
     else:
@@ -1004,36 +1044,59 @@ def update_command_line_function(*args):
 
     if stdout_var.get() == 1 and bool(output_folder_string_var.get()) and bool(setname_string_var.get()):
         stdout_arg.set(' 1> {}/{}.out'.format(output_dir.get(), setname_string_var.get()))
-    else:
-        stdout_arg.set('')
-
-    if stderr_var.get() == 1 and bool(output_folder_string_var.get()) and bool(setname_string_var.get()):
         stderr_arg.set(' 2> {}/{}.err'.format(output_dir.get(), setname_string_var.get()))
     else:
+        stdout_arg.set('')
         stderr_arg.set('')
 
-    command_line_output_string_var.set('{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}'.format(current_pipeline,
-                                                                                read_mode_arg.get(),
-                                                                                peak_type_arg.get(),
-                                                                                output_folder_arg.get(),
-                                                                                setname_arg.get(),
-                                                                                genome_ref_arg.get(),
-                                                                                genome_folder_arg.get(),
-                                                                                sample_table_arg.get(),
-                                                                                setting_table_arg.get(),
-                                                                                known_motif_arg.get(),
-                                                                                fcmerge_arg.get(),
-                                                                                goann_arg.get(),
-                                                                                pathann_arg.get(),
-                                                                                deltemp_arg.get(),
-                                                                                cpu_count_arg.get(),
-                                                                                stdout_arg.get(),
-                                                                                stderr_arg.get()))
+
+    command_line_output_string_var.set('{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}'.format(chipap_program_name,
+                                                                                        read_mode_arg.get(),
+                                                                                        peak_type_arg.get(),
+                                                                                        output_folder_arg.get(),
+                                                                                        setname_arg.get(),
+                                                                                        genome_ref_arg.get(),
+                                                                                        genome_folder_arg.get(),
+                                                                                        sample_table_arg.get(),
+                                                                                        setting_table_arg.get(),
+                                                                                        known_motif_arg.get(),
+                                                                                        homer_motif_arg.get(),
+                                                                                        meme_motif_arg.get(),
+                                                                                        fcmerge_arg.get(),
+                                                                                        goann_arg.get(),
+                                                                                        pathann_arg.get(),
+                                                                                        deltemp_arg.get(),
+                                                                                        cpu_count_arg.get(),
+                                                                                        stdout_arg.get(),
+                                                                                        stderr_arg.get()))
 
 
 def check_traced_input_function(*args):
     check_required_input_function()
     update_command_line_function()
+
+
+def sample_table_entry_trace_load_function(*args):
+    if bool(sample_table_string_var.get()):
+        if not os.path.isfile(sample_table_string_var.get()):
+            sample_table_notification_string_var.set('Sample table not found')
+            sample_table_notification_label.config(fg = 'red')
+            clear_sample_function('valuesonly')
+        elif os.path.isfile(sample_table_string_var.get()):
+            sample_table_loading_test_function()
+
+
+def setting_table_entry_trace_load_function(*args):
+    if bool(setting_table_string_var.get()):
+        if '[MODIFIED]' in setting_table_string_var.get():
+            pass
+        elif not os.path.isfile(setting_table_string_var.get()):
+            setting_table_notification_string_var.set('Setting table not found')
+            setting_table_notification_label.config(fg = 'red')
+            clear_setting_function('valuesonly')
+            read_setting_table_function(default_setting_table_file_full_path)
+        elif os.path.isfile(setting_table_string_var.get()):
+            setting_table_loading_test_function()
 
 
 ########################################################################################################################
@@ -1092,8 +1155,10 @@ genrich_arg = tk.StringVar()
 homer_mergePeaks_arg = tk.StringVar()
 homer_annotatePeaks_arg = tk.StringVar()
 fold_change_calculator_arg = tk.StringVar()
+homer_findMotifsGenome_arg = tk.StringVar()
+meme_chip_arg = tk.StringVar()
 
-setting_table_string_var = tk.StringVar(value = setting_table_file_full_path)
+setting_table_string_var = tk.StringVar(value = default_setting_table_file_full_path)
 setting_table_notification_string_var = tk.StringVar(value = "Currently using default settings table")
 
 genome_ref_string_var = tk.StringVar(value = genome_ref_options[0])
@@ -1107,7 +1172,11 @@ goann_var = tk.IntVar()
 pathann_var = tk.IntVar()
 deltemp_var = tk.IntVar(value = 1)
 stdout_var = tk.IntVar()
-stderr_var = tk.IntVar()
+# stderr_var = tk.IntVar()
+
+homer_motif_string_var = tk.StringVar(value = homer_motif_options[0])
+meme_motif_string_var = tk.StringVar(value = meme_motif_options[0])
+
 cpu_count_string_var = tk.StringVar()
 cpu_count_notification_string_var = tk.StringVar()
 
@@ -1129,8 +1198,28 @@ deltemp_arg = tk.StringVar()
 stdout_arg = tk.StringVar()
 stderr_arg = tk.StringVar()
 cpu_count_arg = tk.StringVar()
+homer_motif_arg = tk.StringVar()
+meme_motif_arg = tk.StringVar()
 
 output_dir = tk.StringVar()
+
+########################################################################################################################
+
+image = Image.open(chipap_logo_full_path)
+image = image.resize((300, 110), Image.ANTIALIAS)
+photo = ImageTk.PhotoImage(image)
+
+chipap_logo = tk.Label(root, image = photo, anchor = "center")
+chipap_logo.image = photo
+chipap_logo.grid(row = 1, column = 1, rowspan = 4, columnspan = 3, sticky = "w",padx = 3)
+
+chipap_about = tk.Text(root, width = 61, height = 7, relief = tk.FLAT, bg = 'gray85',font = (None, 9))
+chipap_about_text = 'Integrated Analysis Pipeline for Unbiased ChIP-seq Analysis\n\nComplete guides and walkthroughs can be found on our github\n(https://github.com/JSuryatenggara/ChIP-AP)\n\nIf you use ChIP-AP please cite our bioRxiv pre-print article\n(https://www.biorxiv.org/content/10.1101/2021.04.18.440382v1)'
+chipap_about.insert(tk.END, chipap_about_text)
+chipap_about.config(state = tk.DISABLED)
+chipap_about.tag_configure("center", justify = tk.CENTER)
+chipap_about.tag_add("center", 1.0, tk.END)
+chipap_about.grid(row = 1, column = 3, rowspan = 4, columnspan = 7, sticky = "e", padx = 5, pady = 2)
 
 ########################################################################################################################
 
@@ -1197,6 +1286,7 @@ def sample_button_switch_function():
 
     sample_table_button.config(state = sample_table_button_state)
     clear_sample_button.config(state = sample_table_button_state)
+    sample_table_entry.config(state = sample_table_button_state)
 
     check_required_input_function()
     rearrange_entry_field_function()
@@ -1209,25 +1299,50 @@ read_mode_label = tk.Label(root, text = "Dataset sequencing mode:", justify = tk
 read_mode_label.grid(row = 1, column = 11, columnspan = 4, padx = 10, pady = (5,2))
 
 single_end_radio = tk.Radiobutton(root, text = "Single end", padx = 10, variable = read_mode_string_var, value = 'single', width = 30, command = lambda : sample_button_switch_function())
-CreateToolTip(single_end_radio, text = 'Select this if there is one sequencer output file per sample.')
+CreateToolTip(single_end_radio, text = 'Select this if there is one\noutput file per sample')
 single_end_radio.grid(row = 2, column = 11, columnspan = 4, padx = 10)
 
 paired_end_radio = tk.Radiobutton(root, text = "Paired end", padx = 10, variable = read_mode_string_var, value = 'paired', width = 30, command = lambda : sample_button_switch_function())
-CreateToolTip(paired_end_radio, text = 'Select this if there are two sequencer output files per sample.\nThey are typically in pairs R1 and R2 for every sample.')
+CreateToolTip(paired_end_radio, text = 'Select this if there are two\noutput files per sample.\nThey are typically in pairs:\nR1 and R2 for every sample')
 paired_end_radio.grid(row = 3, column = 11, columnspan = 4, padx = 10, pady = (0,5))
 
 ########################################################################################################################
 
+def mea_switch_function():
+    if peak_type_string_var.get() == 'narrow':
+        homer_motif_label.config(fg = 'black')
+        meme_motif_label.config(fg = 'black')
+        homer_motif_drop_down.config(state = tk.NORMAL)
+        meme_motif_drop_down.config(state = tk.NORMAL)
+    elif peak_type_string_var.get() == 'broad':
+        homer_motif_string_var.set(homer_motif_options[0])
+        meme_motif_string_var.set(meme_motif_options[0])
+        homer_motif_label.config(fg = 'grey60')
+        meme_motif_label.config(fg = 'grey60')
+        homer_motif_drop_down.config(state = tk.DISABLED)
+        meme_motif_drop_down.config(state = tk.DISABLED)
+    elif peak_type_string_var.get() == 'unsure':
+        homer_motif_label.config(fg = 'black')
+        meme_motif_label.config(fg = 'black')
+        homer_motif_drop_down.config(state = tk.NORMAL)
+        meme_motif_drop_down.config(state = tk.NORMAL)
+
+    rearrange_entry_field_function()
+
 peak_type_label = tk.Label(root, text = "Dataset peak type:", justify = tk.LEFT, width = 30)
 peak_type_label.grid(row = 1, column = 16, columnspan = 4, padx = 10, pady = (5,2))
 
-narrow_peak_radio = tk.Radiobutton(root, text = "Narrow peaks", padx = 10, variable = peak_type_string_var, value = 'narrow', width = 30)
-CreateToolTip(narrow_peak_radio, text = 'Select this for ChIP-seq experiment with transcription factor protein.')
+narrow_peak_radio = tk.Radiobutton(root, text = "Narrow peaks", padx = 10, variable = peak_type_string_var, value = 'narrow', width = 30, command = lambda : mea_switch_function())
+CreateToolTip(narrow_peak_radio, text = 'Select this for ChIP-seq experiment\nusing transcription factor protein')
 narrow_peak_radio.grid(row = 2, column = 16, columnspan = 4, padx = 10)
 
-broad_peak_radio = tk.Radiobutton(root, text = "Broad peaks", padx = 10, variable = peak_type_string_var, value = 'broad', width = 30)
-CreateToolTip(broad_peak_radio, text = 'Select this for ChIP-seq experiment with chromatin modifier protein.')
-broad_peak_radio.grid(row = 3, column = 16, columnspan = 4, padx = 10, pady = (0,5))
+broad_peak_radio = tk.Radiobutton(root, text = "Broad peaks", padx = 10, variable = peak_type_string_var, value = 'broad', width = 30, command = lambda : mea_switch_function())
+CreateToolTip(broad_peak_radio, text = 'Select this for ChIP-seq experiment\nusing chromatin modifier protein')
+broad_peak_radio.grid(row = 3, column = 16, columnspan = 4, padx = 10)
+
+unsure_peak_radio = tk.Radiobutton(root, text = "Unsure", padx = 10, variable = peak_type_string_var, value = 'unsure', width = 30, command = lambda : mea_switch_function())
+CreateToolTip(unsure_peak_radio, text = 'Select this for ChIP-seq experiment\nusing protein with both possibilities')
+unsure_peak_radio.grid(row = 4, column = 16, columnspan = 4, padx = 10, pady = (0,5))
 
 ttk.Separator(root, style = "Line.TSeparator", orient = tk.HORIZONTAL).grid(row = 5, column = 0, columnspan = 21, sticky = "we")
 
@@ -1241,8 +1356,8 @@ def sample_table_button_function():
         sample_table_loading_test_function()
 
     else:
-        clear_sample_button_function()
-        sample_table_notification_string_var.set('No sample table was selected. No samples were loaded.')
+        clear_sample_function('withfile')
+        sample_table_notification_string_var.set('No sample table was selected. No samples were loaded')
         sample_table_notification_label.config(fg = 'red')
         
         rearrange_entry_field_function()
@@ -1260,8 +1375,8 @@ def sample_table_loading_test_function():
         ctrl_r1_sample_list = []
         chip_r2_sample_list = []
         ctrl_r2_sample_list = []
-        clear_sample_button_function()
-        sample_table_notification_string_var.set('Sample table loading error! No samples were loaded.')
+        clear_sample_function('withfile')
+        sample_table_notification_string_var.set('Sample table loading error! No samples were loaded')
         sample_table_notification_label.config(fg = 'red')
         return False
 
@@ -1276,8 +1391,8 @@ def sample_table_loading_test_function():
         ctrl_r1_sample_list = []
         chip_r2_sample_list = []
         ctrl_r2_sample_list = []
-        clear_sample_button_function()
-        sample_table_notification_string_var.set('Sample table reading error! No samples were loaded.')
+        clear_sample_function('withfile')
+        sample_table_notification_string_var.set('Sample table reading error! No samples were loaded')
         sample_table_notification_label.config(fg = 'red')
         return False
 
@@ -1285,8 +1400,8 @@ def sample_table_loading_test_function():
     if read_mode_string_var.get() == 'single':
 
         if not all(chip_r2 == '' for chip_r2 in chip_r2_sample_list) or not all(ctrl_r2 == '' for ctrl_r2 in ctrl_r2_sample_list):
-            clear_sample_button_function()
-            sample_table_notification_string_var.set('Error! Paired samples detected. No samples were loaded.')
+            clear_sample_function('withfile')
+            sample_table_notification_string_var.set('Error! Paired samples detected. No samples were loaded')
             sample_table_notification_label.config(fg = 'red')
             return False
         
@@ -1311,7 +1426,7 @@ def sample_table_loading_test_function():
             except:
                 pass
             
-            sample_table_notification_string_var.set('Sample table loading successful.')
+            sample_table_notification_string_var.set('Sample table loading successful')
             sample_table_notification_label.config(fg = 'green')
             rearrange_entry_field_function()
             return True
@@ -1347,15 +1462,16 @@ def sample_table_loading_test_function():
         except:
             pass
 
-        sample_table_notification_string_var.set('Sample table loading successful.')
+        sample_table_notification_string_var.set('Sample table loading successful')
         sample_table_notification_label.config(fg = 'green')
         
         rearrange_entry_field_function()
 
 
-def clear_sample_button_function():
-
-    sample_table_string_var.set('')
+def clear_sample_function(clear_sample_function_arg):
+    
+    if clear_sample_function_arg == 'withfile':
+        sample_table_string_var.set('')
 
     chip_rep1_r1_string_var.set('')
     chip_rep1_r2_string_var.set('')
@@ -1379,20 +1495,22 @@ def clear_sample_button_function():
     ctrl_rep5_r1_string_var.set('')
     ctrl_rep5_r2_string_var.set('')
 
+    rearrange_entry_field_function()
+
 
 sample_table_notification_label = tk.Label(root, textvariable = sample_table_notification_string_var, width = 70, padx = 10, pady = 4, fg = 'blue')
 sample_table_notification_string_var.set('Please specify data sequencing mode first!')
 sample_table_notification_label.grid(row = 6, column = 1, padx = 10, pady = 4, columnspan = 9)
 
 sample_table_button = tk.Button(root, text = 'Load sample table', command = lambda:sample_table_button_function(), state = tk.DISABLED, width = 15)
-CreateToolTip(sample_table_button, text = 'Click here to browse and select your sample table file.')
+CreateToolTip(sample_table_button, text = 'Click here to browse and\nselect your sample table file')
 sample_table_button.grid(sticky = "we", row = 7, column = 1, padx = 10, rowspan = 1, columnspan = 1)
 
-sample_table_entry = tk.Entry(root, textvariable = sample_table_string_var, width = 50, justify = tk.RIGHT)
+sample_table_entry = tk.Entry(root, textvariable = sample_table_string_var, width = 50, justify = tk.RIGHT, state = tk.DISABLED)
 sample_table_entry.grid(sticky = "we", row = 7, column = 2, padx = (0,10), columnspan = 8, ipady = 3)
 
-clear_sample_button = tk.Button(root, text = 'Clear samples', command = lambda:clear_sample_button_function(), state = tk.DISABLED, width = 15)
-CreateToolTip(clear_sample_button, text = 'Click here to clear all assigned samples below.')
+clear_sample_button = tk.Button(root, text = 'Clear samples', command = lambda:clear_sample_function('withfile'), state = tk.DISABLED, width = 15)
+CreateToolTip(clear_sample_button, text = 'Click here to clear all\nassigned samples below')
 clear_sample_button.grid(sticky = "we", row = 8, column = 1, padx = 10, pady = (4,5), rowspan = 1, columnspan = 1)
 
 ########################################################################################################################
@@ -1418,7 +1536,7 @@ def setting_table_loading_test_function():
         # Check the formatting of the custom settings table, to ensure correct program-argument readings.
         # Check if the table consists of two columns 
         if len(setting_table_header) != 2:
-            clear_setting_function()
+            clear_setting_function('withfile')
             default_setting_button_function()
             setting_table_notification_string_var.set('Columns error, reverted to default')
             setting_table_notification_label.config(fg = 'red')
@@ -1429,23 +1547,27 @@ def setting_table_loading_test_function():
         # Check if the table headers are 'program' and 'argument'. Check first if they are both strings to avoid TypeError.
         if isinstance(setting_table_header[0], str) and isinstance(setting_table_header[1], str):
             if setting_table_header[0].strip().lower() != 'program' or setting_table_header[1].strip().lower() != 'argument':
-                clear_setting_function()
+                clear_setting_function('withfile')
                 default_setting_button_function()
                 setting_table_notification_string_var.set('Header error, reverted to default')
                 setting_table_notification_label.config(fg = 'red')
 
             else:
-                setting_table_notification_string_var.set('Custom settings table loading successful')
-                setting_table_notification_label.config(fg = 'green')
+                if setting_table_string_var.get() == default_setting_table_file_full_path:
+                    setting_table_notification_string_var.set('Currently using default settings table')
+                    setting_table_notification_label.config(fg = 'blue')
+                else:
+                    setting_table_notification_string_var.set('Custom settings table loading successful')
+                    setting_table_notification_label.config(fg = 'green')
 
         else:
-            clear_setting_function()
+            clear_setting_function('withfile')
             default_setting_button_function()
             setting_table_notification_string_var.set('Header error, reverted to default')
             setting_table_notification_label.config(fg = 'red')
 
     except:
-        clear_setting_function()
+        clear_setting_function('withfile')
         default_setting_button_function()
         setting_table_notification_string_var.set('Custom settings table loading error, reverted to default')
         setting_table_notification_label.config(fg = 'red')
@@ -1454,6 +1576,8 @@ def setting_table_loading_test_function():
     rearrange_entry_field_function()
 
     if setting_table_notification_string_var.get() == 'Custom settings table loading successful':
+        return True
+    if setting_table_notification_string_var.get() == 'Currently using default settings table':
         return True
     else:
         return False
@@ -1470,6 +1594,7 @@ def read_setting_table_function(read_setting_table_arg):
     setting_table_argument_colnum   = setting_table_header.index('argument')
     setting_table_array             = setting_table_df.values.tolist()
 
+    global argument_dict
     argument_dict = {}
 
     for suite_program in suite_program_list:
@@ -1502,11 +1627,13 @@ def read_setting_table_function(read_setting_table_arg):
     homer_mergePeaks_arg.set(' '.join(argument_dict['homer_mergePeaks']))
     homer_annotatePeaks_arg.set(' '.join(argument_dict['homer_annotatePeaks']))
     fold_change_calculator_arg.set(' '.join(argument_dict['fold_change_calculator']))
+    homer_findMotifsGenome_arg.set(' '.join(argument_dict['homer_findMotifsGenome']))
+    meme_chip_arg.set(' '.join(argument_dict['meme_chip']))
 
+def clear_setting_function(clear_setting_function_arg):
 
-def clear_setting_function():
-
-    setting_table_string_var.set('')
+    if clear_setting_function_arg == 'withfile':
+        setting_table_string_var.set('')
 
     fastqc1_arg.set('')
     clumpify_arg.set('')
@@ -1525,6 +1652,8 @@ def clear_setting_function():
     homer_mergePeaks_arg.set('')
     homer_annotatePeaks_arg.set('')
     fold_change_calculator_arg.set('')
+    homer_findMotifsGenome_arg.set('')
+    meme_chip_arg.set('')
 
     rearrange_entry_field_function()
 
@@ -1532,16 +1661,25 @@ def clear_setting_function():
 def default_setting_button_function():
     setting_table_notification_string_var.set('Default values restored')
     setting_table_notification_label.config(fg = 'blue')
-    setting_table_string_var.set(setting_table_file_full_path)
-    read_setting_table_function(setting_table_file_full_path)
+    setting_table_string_var.set(default_setting_table_file_full_path)
+    read_setting_table_function(default_setting_table_file_full_path)
 
     rearrange_entry_field_function()
 
 
 def setting_table_window_open():
+    if '[MODIFIED]' in setting_table_string_var.get():
+        pass
+    else:
+        if setting_table_loading_test_function() == False:
+            return
+        elif setting_table_loading_test_function() == True:
+            pass
+
+    global setting_table_window
+
     setting_table_window = tk.Toplevel()
     setting_table_window.grab_set()
-
 
     fastqc1_arg_label = tk.Label(setting_table_window, text = 'fastqc1', width = 22, padx = 10, pady = 4, anchor = "e")
     clumpify_arg_label = tk.Label(setting_table_window, text = 'clumpify', width = 22, padx = 10, pady = 4, anchor = "e")
@@ -1560,7 +1698,8 @@ def setting_table_window_open():
     homer_mergePeaks_arg_label = tk.Label(setting_table_window, text = 'homer_mergePeaks', width = 22, padx = 10, pady = 4, anchor = "e")
     homer_annotatePeaks_arg_label = tk.Label(setting_table_window, text = 'homer_annotatePeaks', width = 22, padx = 10, pady = 4, anchor = "e")
     fold_change_calculator_arg_label = tk.Label(setting_table_window, text = 'fold_change_calculator', width = 22, padx = 10, pady = 4, anchor = "e")
-
+    homer_findMotifsGenome_label = tk.Label(setting_table_window, text = 'homer_findMotifsGenome', width = 22, padx = 10, pady = 4, anchor = "e")
+    meme_chip_label = tk.Label(setting_table_window, text = 'meme_chip', width = 22, padx = 10, pady = 4, anchor = "e")
 
     fastqc1_arg_entry = tk.Entry(setting_table_window, textvariable = fastqc1_arg, width = 50, justify = tk.LEFT)
     clumpify_arg_entry = tk.Entry(setting_table_window, textvariable = clumpify_arg, width = 50, justify = tk.LEFT)
@@ -1579,7 +1718,8 @@ def setting_table_window_open():
     homer_mergePeaks_arg_entry = tk.Entry(setting_table_window, textvariable = homer_mergePeaks_arg, width = 50, justify = tk.LEFT)
     homer_annotatePeaks_arg_entry = tk.Entry(setting_table_window, textvariable = homer_annotatePeaks_arg, width = 50, justify = tk.LEFT)
     fold_change_calculator_arg_entry = tk.Entry(setting_table_window, textvariable = fold_change_calculator_arg, width = 50, justify = tk.LEFT)
-
+    homer_findMotifsGenome_arg_entry = tk.Entry(setting_table_window, textvariable = homer_findMotifsGenome_arg, width = 50, justify = tk.LEFT)
+    meme_chip_arg_entry = tk.Entry(setting_table_window, textvariable = meme_chip_arg, width = 50, justify = tk.LEFT)
 
     fastqc1_arg_label.grid(sticky = "we", row = 35, column = 11, padx = 10, columnspan = 1, pady = (10,0))
     clumpify_arg_label.grid(sticky = "we", row = 36, column = 11, padx = 10, columnspan = 1)
@@ -1597,8 +1737,9 @@ def setting_table_window_open():
     genrich_arg_label.grid(sticky = "we", row = 48, column = 11, padx = 10, columnspan = 1)
     homer_mergePeaks_arg_label.grid(sticky = "we", row = 49, column = 11, padx = 10, columnspan = 1)
     homer_annotatePeaks_arg_label.grid(sticky = "we", row = 50, column = 11, padx = 10, columnspan = 1)
-    fold_change_calculator_arg_label.grid(sticky = "we", row = 51, column = 11, padx = 10, columnspan = 1, pady = (0,10))
-
+    fold_change_calculator_arg_label.grid(sticky = "we", row = 51, column = 11, padx = 10, columnspan = 1)
+    homer_findMotifsGenome_label.grid(sticky = "we", row = 52, column = 11, padx = 10, columnspan = 1)
+    meme_chip_label.grid(sticky = "we", row = 53, column = 11, padx = 10, columnspan = 1, pady = (0,10))
 
     fastqc1_arg_entry.grid(sticky = "we", row = 35, column = 12, padx = (0,10), columnspan = 8, ipady = 3, pady = (10,0))
     clumpify_arg_entry.grid(sticky = "we", row = 36, column = 12, padx = (0,10), columnspan = 8, ipady = 3)
@@ -1616,17 +1757,74 @@ def setting_table_window_open():
     genrich_arg_entry.grid(sticky = "we", row = 48, column = 12, padx = (0,10), columnspan = 8, ipady = 3)
     homer_mergePeaks_arg_entry.grid(sticky = "we", row = 49, column = 12, padx = (0,10), columnspan = 8, ipady = 3)
     homer_annotatePeaks_arg_entry.grid(sticky = "we", row = 50, column = 12, padx = (0,10), columnspan = 8, ipady = 3)
-    fold_change_calculator_arg_entry.grid(sticky = "we", row = 51, column = 12, padx = (0,10), columnspan = 8, ipady = 3, pady = (0,10))
+    fold_change_calculator_arg_entry.grid(sticky = "we", row = 51, column = 12, padx = (0,10), columnspan = 8, ipady = 3)
+    homer_findMotifsGenome_arg_entry.grid(sticky = "we", row = 52, column = 12, padx = (0,10), columnspan = 8, ipady = 3)
+    meme_chip_arg_entry.grid(sticky = "we", row = 53, column = 12, padx = (0,10), columnspan = 8, ipady = 3, pady = (0,10))
 
     window_default_setting_button = tk.Button(setting_table_window, text = 'Restore defaults', command = lambda:default_setting_button_function(), state = tk.NORMAL, width = 22)
-    CreateToolTip(window_default_setting_button, text = 'Click here if you want to restore to ChIP-AP pipeline default settings')
+    CreateToolTip(window_default_setting_button, text = 'Click here if you want to restore\nto ChIP-AP pipeline default settings')
     window_default_setting_button.grid(sticky = "w", row = 60, column = 11, padx = 10, pady = (4,10), rowspan = 1, columnspan = 1)
 
-    setting_table_window_close_button = tk.Button(setting_table_window, text = 'Accept and close', command = lambda:setting_table_window.destroy(), state = tk.NORMAL, width = 22)
-    CreateToolTip(setting_table_window_close_button, text = 'Click here to accept the settings above and close this window')
+    setting_table_window_close_button = tk.Button(setting_table_window, text = 'Accept and close', command = lambda:setting_table_window_close(), state = tk.NORMAL, width = 22)
+    CreateToolTip(setting_table_window_close_button, text = 'Click here to accept the settings\nabove and close this window')
     setting_table_window_close_button.grid(sticky = "e", row = 60, column = 12, padx = 10, pady = (4,10), rowspan = 1, columnspan = 8)
 
     rearrange_entry_field_function()
+
+
+def setting_table_window_close():
+    current_setting_table_full_path = setting_table_string_var.get()
+
+    if fastqc1_arg.get() != ' '.join(argument_dict['fastqc1']):
+        setting_changed = 1
+    elif clumpify_arg.get() != ' '.join(argument_dict['clumpify']):
+        setting_changed = 1
+    elif bbduk_arg.get() != ' '.join(argument_dict['bbduk']):
+        setting_changed = 1
+    elif trimmomatic_arg.get() != ' '.join(argument_dict['trimmomatic']):
+        setting_changed = 1
+    elif fastqc2_arg.get() != ' '.join(argument_dict['fastqc2']):
+        setting_changed = 1
+    elif bwa_mem_arg.get() != ' '.join(argument_dict['bwa_mem']):
+        setting_changed = 1
+    elif samtools_view_arg.get() != ' '.join(argument_dict['samtools_view']):
+        setting_changed = 1
+    elif plotfingerprint_arg.get() != ' '.join(argument_dict['plotfingerprint']):
+        setting_changed = 1
+    elif fastqc3_arg.get() != ' '.join(argument_dict['fastqc3']):
+        setting_changed = 1
+    elif macs2_callpeak_arg.get() != ' '.join(argument_dict['macs2_callpeak']):
+        setting_changed = 1
+    elif gem_arg.get() != ' '.join(argument_dict['gem']):
+        setting_changed = 1
+    elif sicer2_arg.get() != ' '.join(argument_dict['sicer2']):
+        setting_changed = 1
+    elif homer_findPeaks_arg.get() != ' '.join(argument_dict['homer_findPeaks']):
+        setting_changed = 1
+    elif genrich_arg.get() != ' '.join(argument_dict['genrich']):
+        setting_changed = 1
+    elif homer_mergePeaks_arg.get() != ' '.join(argument_dict['homer_mergePeaks']):
+        setting_changed = 1
+    elif homer_annotatePeaks_arg.get() != ' '.join(argument_dict['homer_annotatePeaks']):
+        setting_changed = 1
+    elif fold_change_calculator_arg.get() != ' '.join(argument_dict['fold_change_calculator']):
+        setting_changed = 1
+    elif homer_findMotifsGenome_arg.get() != ' '.join(argument_dict['homer_findMotifsGenome']):
+        setting_changed = 1
+    elif meme_chip_arg.get() != ' '.join(argument_dict['meme_chip']):
+        setting_changed = 1
+    else:
+        setting_changed = 0
+
+    if setting_changed == 1:
+        setting_table_notification_string_var.set('Settings were manually modified by user')
+        setting_table_notification_label.config(fg = 'orange2')
+        if '[MODIFIED]' not in setting_table_string_var.get(): 
+            setting_table_string_var.set('{}{}'.format(current_setting_table_full_path, '[MODIFIED]'))
+    elif setting_changed == 0:
+        pass
+
+    setting_table_window.destroy()
 
 
 setting_table_notification_label = tk.Label(root, textvariable = setting_table_notification_string_var, width = 70, padx = 10, pady = 4, fg = 'blue')
@@ -1634,7 +1832,7 @@ setting_table_notification_string_var.set("Currently using default settings tabl
 setting_table_notification_label.grid(row = 6, column = 11, padx = 10, pady = 4, columnspan = 9)
 
 setting_table_button = tk.Button(root, text = 'Load setting table', command = lambda:setting_table_button_function(), state = tk.NORMAL, width = 15)
-CreateToolTip(setting_table_button, text = 'Click here to browse and select your setting table file.')
+CreateToolTip(setting_table_button, text = 'Click here to browse and\nselect your setting table file')
 setting_table_button.grid(sticky = "we", row = 7, column = 11, padx = 10, rowspan = 1, columnspan = 1)
 
 read_setting_table_function(setting_table_string_var.get())
@@ -1642,11 +1840,11 @@ setting_table_entry = tk.Entry(root, textvariable = setting_table_string_var, wi
 setting_table_entry.grid(sticky = "we", row = 7, column = 12, padx = (0,10), columnspan = 8, ipady = 3)
 
 default_setting_button = tk.Button(root, text = 'Default settings', command = lambda:default_setting_button_function(), state = tk.NORMAL, width = 15)
-CreateToolTip(default_setting_button, text = 'Click here if you want to restore to ChIP-AP pipeline default settings.')
+CreateToolTip(default_setting_button, text = 'Click here if you want to restore\nto ChIP-AP pipeline default settings')
 default_setting_button.grid(sticky = "we", row = 8, column = 11, padx = 10, pady = (4,5), rowspan = 1, columnspan = 1)
 
 setting_table_window_open_button = tk.Button(root, text = 'Manual customization >>', command = lambda:setting_table_window_open(), state = tk.NORMAL, width = 25)
-CreateToolTip(setting_table_window_open_button, text = "Warning: proceed only when you know what you are doing.\nOtherwise, please just leave them at their default values.\nInvalid values will cause the whole pipeline run to break.\nCheck GitHub documentation to learn more about custom settings.")
+CreateToolTip(setting_table_window_open_button, text = "Warning: proceed only when\nyou know what you are doing.\nOtherwise, leave all settings\nat their default values.\nInvalid values will\nlikely cause the whole\npipeline run to break.\nCheck GitHub documentation\nto learn more about\ncustom settings.")
 setting_table_window_open_button.grid(sticky = "e", row = 8, column = 12, padx = 10, pady = (4,5), rowspan = 1, columnspan = 8)
     
 ttk.Separator(root, style = "Line.TSeparator", orient = tk.HORIZONTAL).grid(row = 10, column = 10, columnspan = 11, sticky = "we")
@@ -1743,16 +1941,16 @@ chip_rep5_r1_entry = tk.Entry(root, textvariable = chip_rep5_r1_string_var, widt
 chip_rep5_r2_button = tk.Button(root, text ='ChIP rep 5 read 2', command = lambda:chip_rep5_r2_button_function(), state = tk.DISABLED, width = 15)
 chip_rep5_r2_entry = tk.Entry(root, textvariable = chip_rep5_r2_string_var, width = 50, justify = tk.RIGHT, state = tk.DISABLED)
 
-CreateToolTip(chip_rep1_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(chip_rep1_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(chip_rep2_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(chip_rep2_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(chip_rep3_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(chip_rep3_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(chip_rep4_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(chip_rep4_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(chip_rep5_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(chip_rep5_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
+CreateToolTip(chip_rep1_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(chip_rep1_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(chip_rep2_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(chip_rep2_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(chip_rep3_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(chip_rep3_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(chip_rep4_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(chip_rep4_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(chip_rep5_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(chip_rep5_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
 
 chip_rep1_r1_button.grid(sticky = "we", column = 1, row = 12, padx = 10, columnspan = 1, pady = (5,0))
 chip_rep1_r2_button.grid(sticky = "we", column = 1, row = 13, padx = 10, columnspan = 1, pady = (0,5))
@@ -1876,16 +2074,16 @@ ctrl_rep5_r1_entry = tk.Entry(root, textvariable = ctrl_rep5_r1_string_var, widt
 ctrl_rep5_r2_button = tk.Button(root, text ='Ctrl rep 5 read 2', command = lambda:ctrl_rep5_r2_button_function(), state = tk.DISABLED, width = 15)
 ctrl_rep5_r2_entry = tk.Entry(root, textvariable = ctrl_rep5_r2_string_var, width = 50, justify = tk.RIGHT, state = tk.DISABLED)
 
-CreateToolTip(ctrl_rep1_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(ctrl_rep1_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(ctrl_rep2_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(ctrl_rep2_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(ctrl_rep3_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(ctrl_rep3_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(ctrl_rep4_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(ctrl_rep4_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(ctrl_rep5_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
-CreateToolTip(ctrl_rep5_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam file extension accepted)')
+CreateToolTip(ctrl_rep1_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(ctrl_rep1_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(ctrl_rep2_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(ctrl_rep2_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(ctrl_rep3_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(ctrl_rep3_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(ctrl_rep4_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(ctrl_rep4_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(ctrl_rep5_r1_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
+CreateToolTip(ctrl_rep5_r2_button, text = 'Click here to browse and select your file\n(.fastq, .fastq.gz, .fq, .fq.gz, or .bam\nfile extension accepted)')
 
 ctrl_rep1_r1_button.grid(sticky = "we", column = 11, row = 12, padx = 10, columnspan = 1, pady = (5,0))
 ctrl_rep1_r2_button.grid(sticky = "we", column = 11, row = 13, padx = 10, columnspan = 1, pady = (0,5))
@@ -1920,27 +2118,27 @@ ttk.Separator(root, style = "Line.TSeparator", orient = tk.HORIZONTAL).grid(row 
 ########################################################################################################################
 
 def auto_assign_genome_folder_function():
-    if genome_ref_string_var.get() == "hg38 (Homo sapiens build 38)":
+    if genome_ref_string_var.get() == "hg38 (Homo sapiens)":
         genome_folder_string_var.set(genome_folder_full_path)
         genome_folder_button.config(state = tk.DISABLED)
         genome_folder_entry.config(state = tk.DISABLED)
-    elif genome_ref_string_var.get() == "hg19 (Homo sapiens build 19)":
+    elif genome_ref_string_var.get() == "hg19 (Homo sapiens)":
         genome_folder_string_var.set(genome_folder_full_path)
         genome_folder_button.config(state = tk.DISABLED)
         genome_folder_entry.config(state = tk.DISABLED)
-    elif genome_ref_string_var.get() == "mm9 (Mus musculus build 9)":
+    elif genome_ref_string_var.get() == "mm9 (Mus musculus)":
         genome_folder_string_var.set(genome_folder_full_path)
         genome_folder_button.config(state = tk.DISABLED)
         genome_folder_entry.config(state = tk.DISABLED)
-    elif genome_ref_string_var.get() == "mm10 (Mus musculus build 10)":
+    elif genome_ref_string_var.get() == "mm10 (Mus musculus)":
         genome_folder_string_var.set(genome_folder_full_path)
         genome_folder_button.config(state = tk.DISABLED)
         genome_folder_entry.config(state = tk.DISABLED)
-    elif genome_ref_string_var.get() == "dm6 (Drosophila melanogaster build 6)":
+    elif genome_ref_string_var.get() == "dm6 (Drosophila melanogaster)":
         genome_folder_string_var.set(genome_folder_full_path)
         genome_folder_button.config(state = tk.DISABLED)
         genome_folder_entry.config(state = tk.DISABLED)
-    elif genome_ref_string_var.get() == "sacCer3 (Saccharomyces cerevisiae build 3)":
+    elif genome_ref_string_var.get() == "sacCer3 (Saccharomyces cerevisiae)":
         genome_folder_string_var.set(genome_folder_full_path)
         genome_folder_button.config(state = tk.DISABLED)
         genome_folder_entry.config(state = tk.DISABLED)
@@ -1956,9 +2154,9 @@ genome_ref_label = tk.Label(root, text = "Reference genome:")
 genome_ref_label.grid(row = 35, column = 1, padx = 10, columnspan = 1, pady = (5,0))
 
 genome_ref_drop_down = tk.OptionMenu(root, genome_ref_string_var, *genome_ref_options, command = lambda x = None : auto_assign_genome_folder_function())
-CreateToolTip(genome_ref_drop_down, text = 'Select the genome assembly you want your ChIP-seq reads to be aligned to. Currently, ChIP-AP supports six genome assemblies.\nOutside those supported by ChIP-AP, you will need to generate the reference files yourself')
-genome_ref_drop_down.config(width = 30, takefocus = 1)
-genome_ref_drop_down.grid(sticky = "we", row = 35, column = 2, padx = (0,10), columnspan = 8, pady = (5,0))
+CreateToolTip(genome_ref_drop_down, text = 'Select the genome assembly you want\nyour ChIP-seq reads to be aligned to.\nCurrently, ChIP-AP supports\nsix genome assemblies.\nOutside those supported by\nChIP-AP, you will need to\ngenerate the files yourself')
+genome_ref_drop_down.config(takefocus = 1)
+genome_ref_drop_down.grid(sticky = "we", row = 35, column = 2, columnspan = 4, pady = (5,0), padx = (0,10))
 
 ########################################################################################################################
 
@@ -1972,11 +2170,11 @@ def genome_folder_button_function():
 
 
 genome_folder_button = tk.Button(root, text = 'Genome folder', command = lambda:genome_folder_button_function(), state = tk.DISABLED, width = 15)
-CreateToolTip(genome_folder_button, text = 'Click here to browse and select the directory containing your custom genome reference')
+CreateToolTip(genome_folder_button, text = 'Click here to browse and select\nthe directory containing your\ncustom genome reference')
 genome_folder_button.grid(sticky = "we", row = 37, column = 1, padx = 10, columnspan = 1)
 
-genome_folder_entry = tk.Entry(root, textvariable = genome_folder_string_var, width = 50, justify = tk.RIGHT, state = tk.DISABLED)
-genome_folder_entry.grid(sticky = "we", row = 37, column = 2, padx = (0,10), columnspan = 8, ipady = 3)
+genome_folder_entry = tk.Entry(root, textvariable = genome_folder_string_var, width = 40, justify = tk.RIGHT, state = tk.DISABLED)
+genome_folder_entry.grid(sticky = "we", row = 37, column = 2, columnspan = 4, ipady = 3, padx = (0,10))
 
 ########################################################################################################################
 
@@ -1990,11 +2188,11 @@ def known_motif_button_function():
 
 
 known_motif_button = tk.Button(root, text = 'Known motif file', command = lambda:known_motif_button_function(), state = tk.NORMAL, width = 15)
-CreateToolTip(known_motif_button, text = 'Click here to browse and select your .motif file (in HOMER matrix format)')
+CreateToolTip(known_motif_button, text = 'Click here to browse and select your\n.motif file (in HOMER matrix format)')
 known_motif_button.grid(sticky = "we", row = 39, column = 1, padx = 10, columnspan = 1)
 
-known_motif_entry = tk.Entry(root, textvariable = known_motif_string_var, width = 50, justify = tk.RIGHT)
-known_motif_entry.grid(sticky = "we", row = 39, column = 2, padx = (0,10), columnspan = 8, ipady = 3)
+known_motif_entry = tk.Entry(root, textvariable = known_motif_string_var, width = 40, justify = tk.RIGHT)
+known_motif_entry.grid(sticky = "we", row = 39, column = 2, columnspan = 4, ipady = 3, padx = (0,10))
 
 ########################################################################################################################
 
@@ -2008,60 +2206,78 @@ def output_folder_button_function():
 
 
 output_folder_button = tk.Button(root, text = 'Output save folder', command = lambda:output_folder_button_function(), state = tk.NORMAL, width = 15)
-CreateToolTip(output_folder_button, text = 'Click here to browse and select the directory to save the results of your ChIP-AP pipeline run.\nTo save in a new folder, type in the entry field your new folder name after the output save directory:\nfull_path_to_output_save_directory/new_folder_name')
+CreateToolTip(output_folder_button, text = 'Click here to browse and select\nthe directory to save the results\nof your ChIP-AP pipeline run.\nTo save in a new folder,\ntype in the entry field\nyour new folder name after\nthe output save directory:\nfull_path_to_output_save_directory/\nnew_folder_name')
 output_folder_button.grid(sticky = "we", column = 1, row = 41, padx = 10, columnspan = 1)
 
-output_folder_entry = tk.Entry(root, textvariable = output_folder_string_var, width = 50, justify = tk.RIGHT)
-output_folder_entry.grid(sticky = "we", column = 2, row = 41, padx = (0,10), columnspan = 8, ipady = 3)
+output_folder_entry = tk.Entry(root, textvariable = output_folder_string_var, width = 40, justify = tk.RIGHT)
+output_folder_entry.grid(sticky = "we", column = 2, row = 41, columnspan = 4, ipady = 3, padx = (0,10))
 
 ########################################################################################################################
 
 setname_label = tk.Label(root, text = "Dataset name:", width = 15)
-setname_label.grid(row = 43, column = 1, padx = 10, columnspan = 1)
+setname_label.grid(row = 43, column = 1, padx = 10, columnspan = 1, pady = (0,5))
 
-setname_entry = tk.Entry(root, textvariable = setname_string_var, width = 50, justify = tk.LEFT)
-CreateToolTip(setname_entry, text = 'Type in your desired folder name and prefix for all the resulting output filenames.')
-setname_entry.grid(sticky = "we", row = 43, column = 2, padx = (0,10), columnspan = 8, ipady = 3)
+setname_entry = tk.Entry(root, textvariable = setname_string_var, width = 40, justify = tk.LEFT)
+CreateToolTip(setname_entry, text = 'Type in your folder name and prefix\nfor all the resulting output filenames')
+setname_entry.grid(sticky = "we", row = 43, column = 2, columnspan = 4, ipady = 3, pady = (0,5), padx = (0,10))
 
-ttk.Separator(root, style = "Line.TSeparator", orient = tk.HORIZONTAL).grid(row = 46, column = 0, columnspan = 11, sticky = "we")
+########################################################################################################################
+
+homer_motif_label = tk.Label(root, text = "HOMER motif enrichment:", anchor = "w")
+homer_motif_label.grid(row = 35, column = 7, padx = 5, columnspan = 5, sticky = "sw", pady = (5,0))
+
+homer_motif_drop_down = tk.OptionMenu(root, homer_motif_string_var, *homer_motif_options)
+CreateToolTip(homer_motif_drop_down, text = 'Select the peak set(s) you want\nHOMER findMotifsGenome to perform\nmotif enrichment analysis on')
+homer_motif_drop_down.config(takefocus = 1)
+homer_motif_drop_down.grid(sticky = "we", row = 37, column = 7, padx = 5, columnspan = 5)
+
+########################################################################################################################
+
+meme_motif_label = tk.Label(root, text = "MEME motif enrichment:", anchor = "w")
+meme_motif_label.grid(row = 39, column = 7, padx = 5, columnspan = 5, sticky = "sw")
+
+meme_motif_drop_down = tk.OptionMenu(root, meme_motif_string_var, *meme_motif_options)
+CreateToolTip(meme_motif_drop_down, text = 'Select the peak set(s) you\nwant meme-chip to perform\nmotif enrichment analysis on')
+meme_motif_drop_down.config(takefocus = 1)
+meme_motif_drop_down.grid(sticky = "we", row = 41, column = 7, padx = 5, columnspan = 5)
 
 ########################################################################################################################
 
 fcmerge_checkbox = tk.Checkbutton(root, text = ' Merged fold enrichment analysis', variable = fcmerge_var, onvalue = 1, offvalue = 0)
-CreateToolTip(fcmerge_checkbox, text = 'Check this box if you want the fold enrichment analysis from all replicates combined as one.\nThis option is automatically chosen when there are unequal number of replicates between ChIP and control samples.')
-fcmerge_checkbox.grid(sticky = "w", row = 35, column = 11, columnspan = 10, padx = 10, pady = (5,0))
+CreateToolTip(fcmerge_checkbox, text = 'Check this box if you want\nthe fold enrichment analysis\nfrom all replicates combined as one.\nThis option will be ignored\nwhen there are unequal\nnumber of replicates between\nChIP and control samples')
+fcmerge_checkbox.grid(sticky = "w", row = 35, column = 13, columnspan = 8, padx = (0,10), pady = (5,0))
 
 ########################################################################################################################
 
 goann_checkbox = tk.Checkbutton(root, text = ' Annotate peaks with known gene ontology terms', variable = goann_var, onvalue = 1, offvalue = 0)
-CreateToolTip(goann_checkbox, text = 'Check this box if you want each peak in the final detected peaks list to have gene ontology annotations')
-goann_checkbox.grid(sticky = "w", row = 37, column = 11, columnspan = 10, padx = 10)
+CreateToolTip(goann_checkbox, text = 'Check this box if you want\neach peak in the final peaks list\nto have gene ontology annotations')
+goann_checkbox.grid(sticky = "w", row = 37, column = 13, columnspan = 8, padx = (0,10))
 
 ########################################################################################################################
 
 pathann_checkbox = tk.Checkbutton(root, text = ' Annotate peaks with known pathway terms', variable = pathann_var, onvalue = 1, offvalue = 0)
-CreateToolTip(pathann_checkbox, text = 'Check this box if you want each peak in the final detected peaks list to have pathway annotations')
-pathann_checkbox.grid(sticky = "w", row = 39, column = 11, columnspan = 10, padx = 10)
+CreateToolTip(pathann_checkbox, text = 'Check this box if you want\neach peak in the final peaks list\nto have pathway annotations')
+pathann_checkbox.grid(sticky = "w", row = 39, column = 13, columnspan = 8, padx = (0,10))
 
 ########################################################################################################################
 
 deltemp_checkbox = tk.Checkbutton(root, text = ' Delete large temporary files', variable = deltemp_var, onvalue = 1, offvalue = 0)
-CreateToolTip(deltemp_checkbox, text = 'Check this box if you will not need the large-sized intermediary files.')
-deltemp_checkbox.grid(sticky = "w", row = 41, column = 11, columnspan = 10, padx = 10)
+CreateToolTip(deltemp_checkbox, text = 'Check this box if you will not need\nthe large-sized intermediary files')
+deltemp_checkbox.grid(sticky = "w", row = 41, column = 13, columnspan = 8, padx = (0,10))
 
 ########################################################################################################################
 
-stdout_checkbox = tk.Checkbutton(root, text = ' Record standard outputs', variable = stdout_var, onvalue = 1, offvalue = 0)
-CreateToolTip(stdout_checkbox, text = 'Check this box if you want to save pipeline outputs (channel 1>) in a text file.')
-stdout_checkbox.grid(sticky = "w", row = 43, column = 11, columnspan = 10, padx = 10)
+stdout_checkbox = tk.Checkbutton(root, text = ' Record standard outputs & errors', variable = stdout_var, onvalue = 1, offvalue = 0)
+CreateToolTip(stdout_checkbox, text = 'Check this box if you want to save\npipeline standard outputs (channel 1>) and\nstandard errors (channel 2>) as text files')
+stdout_checkbox.grid(sticky = "w", row = 43, column = 13, columnspan = 8, padx = (0,10), pady = (0,5))
 
 ########################################################################################################################
 
-stderr_checkbox = tk.Checkbutton(root, text = ' Record standard errors', variable = stderr_var, onvalue = 1, offvalue = 0)
-CreateToolTip(stderr_checkbox, text = 'Check this box if you want to save pipeline errors (channel 2>) in a text file.')
-stderr_checkbox.grid(sticky = "w", row = 45, column = 11, columnspan = 10, padx = 10, pady = (5,5))
+# stderr_checkbox = tk.Checkbutton(root, text = ' Record standard errors', variable = stderr_var, onvalue = 1, offvalue = 0)
+# CreateToolTip(stderr_checkbox, text = 'Check this box if you want to save pipeline errors (channel 2>) in a text file')
+# stderr_checkbox.grid(sticky = "w", row = 45, column = 11, columnspan = 10, padx = 10, pady = (5,5))
 
-ttk.Separator(root, style = "Line.TSeparator", orient = tk.HORIZONTAL).grid(row = 46, column = 10, columnspan = 11, sticky = "we")
+ttk.Separator(root, style = "Line.TSeparator", orient = tk.HORIZONTAL).grid(row = 46, column = 0, columnspan = 21, sticky = "we")
 
 ########################################################################################################################
 
@@ -2069,7 +2285,7 @@ cpu_count_label = tk.Label(root, text = "CPU cores to use:", width = 20, justify
 cpu_count_label.grid(row = 62, column = 1, padx = 10, columnspan = 1, pady = 5)
 
 cpu_count_entry = tk.Entry(root, width = 5, textvariable = cpu_count_string_var)
-CreateToolTip(cpu_count_entry, text = 'Type in your desired number of CPU cores to be used by the pipeline')
+CreateToolTip(cpu_count_entry, text = 'Type in the number of CPU cores\nto be used by the pipeline')
 cpu_count_entry.grid(sticky = "w", row = 62, column = 2, padx = (0,10), ipady = 3, pady = 5)
 
 cpu_count_notification_label = tk.Label(root, textvariable = cpu_count_notification_string_var, width = 65, anchor = "w")
@@ -2118,7 +2334,9 @@ def print_setting_table_function():
         genrich_arg.get(),
         homer_mergePeaks_arg.get(),
         homer_annotatePeaks_arg.get(),
-        fold_change_calculator_arg.get()]
+        fold_change_calculator_arg.get(),
+        homer_findMotifsGenome_arg.get(),
+        meme_chip_arg.get()]
 
     setting_table_output_dict = {'program' : suite_program_list, 'argument' : suite_program_arg}
 
@@ -2172,11 +2390,11 @@ def generate_scripts_and_run_function():
 
 
 generate_scripts_button = tk.Button(root, text = 'Generate scripts', command = lambda:generate_scripts_function(), state = tk.DISABLED, width = 18)
-CreateToolTip(generate_scripts_button, text = 'Select this if you wish to run the pipeline later\nby executing MASTER_script.sh within the output save folder')
+CreateToolTip(generate_scripts_button, text = 'Select this if you wish to\nrun the pipeline later\nby executing MASTER_script.sh\nwithin the output save folder')
 generate_scripts_button.grid(row = 62, column = 12, columnspan = 9, sticky = "w", padx = 10, pady = 5)
 
 generate_and_run_scripts_button = tk.Button(root, text = 'Generate and run scripts', command = lambda:generate_scripts_and_run_function(), state = tk.DISABLED, width = 25)
-CreateToolTip(generate_and_run_scripts_button, text = 'Select this if you wish to run the pipeline now\nNOTE: It may take up to several hours depending on your system')
+CreateToolTip(generate_and_run_scripts_button, text = 'Select this if you wish to\nrun the pipeline now\nNOTE: It may take up to\nseveral hours depending\non your system')
 generate_and_run_scripts_button.grid(row = 62, column = 12, columnspan = 9, sticky = "e", padx = 10, pady = 5)
 
 ########################################################################################################################
@@ -2205,7 +2423,9 @@ ctrl_rep5_r1_string_var.trace('w', register_sample_function)
 ctrl_rep5_r2_string_var.trace('w', register_sample_function)
 
 sample_table_string_var.trace('w', check_traced_input_function)
+sample_table_string_var.trace('w', sample_table_entry_trace_load_function)
 setting_table_string_var.trace('w', check_traced_input_function)
+setting_table_string_var.trace('w', setting_table_entry_trace_load_function)
 genome_ref_string_var.trace('w', check_traced_input_function)
 genome_folder_string_var.trace('w', check_traced_input_function)
 known_motif_string_var.trace('w', check_traced_input_function)
@@ -2216,7 +2436,8 @@ goann_var.trace('w', update_command_line_function)
 pathann_var.trace('w', update_command_line_function)
 deltemp_var.trace('w', update_command_line_function)
 stdout_var.trace('w', update_command_line_function)
-stderr_var.trace('w', update_command_line_function)
+homer_motif_string_var.trace('w', update_command_line_function)
+meme_motif_string_var.trace('w', update_command_line_function)
 cpu_count_string_var.trace('w', check_traced_input_function)
 
 register_sample_function()

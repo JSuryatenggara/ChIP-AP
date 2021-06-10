@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+#pyright: reportUnboundVariable=false
+
+
+# script_version = '5.0'
+
 
 # Processes the peak list file "dataset_name_all_peaks_annotated" by:
 #   - Adding the ChIP read depth (a.k.a. ChIP tag count) at each weighted peak center
@@ -19,7 +24,12 @@
 
 # PATCH NOTES
 #   Version 2.1     Added .fillna(0) to the line peak_df['Entrez ID'] = peak_df['Entrez ID'].astype('Int64')
-#                           so that all Entrez ID values can be coverted into integers
+#                       so that all Entrez ID values can be coverted into integers
+#
+#   Version 3.0     Now appends weighted peak center coordinates into the output peak list
+#                       Just like tag counts and fold change, this weighted peak center is replicate-wise
+#                       Due to the absence of weighted peak center in broad peaks, weighted peak center is replaced by 
+#                           simply the midpoint between the broad peak's start and end coordinates
 
 
 
@@ -27,8 +37,6 @@ print('Importing required modules')
 import pandas as pd
 import subprocess
 import multiprocessing
-import sys
-import csv
 import os
 import argparse
 
@@ -152,7 +160,7 @@ def fold_change_calculator_function_narrow(chip_calculator_arg):
         weighted_peak_center_fold_change = chip_weighted_peak_center_read_count
 
     # Return the values of interest
-    return round(chip_weighted_peak_center_read_count, 2), round(ctrl_weighted_peak_center_read_count, 2), round(weighted_peak_center_fold_change, 2)
+    return round(chip_weighted_peak_center_read_count, 2), round(ctrl_weighted_peak_center_read_count, 2), round(weighted_peak_center_fold_change, 2), round(chip_weighted_peak_center_coordinate)
 
 
 
@@ -257,7 +265,7 @@ parser.add_argument('--ctrl_bam',
                     required = True)
 
 parser.add_argument('--normfactor', 
-                    help = '<Required> Assign the factor to use for read counts normalization', 
+                    help = '<Optional> Assign the factor to use for read counts normalization', 
                     choices = ['mapped', 'uniquely_mapped', 'user_value'])
 
 parser.add_argument('--chip_norm', 
@@ -316,11 +324,11 @@ if __name__ == '__main__':
 
     if len(chip_bam_absolute_path) == 1 and len(ctrl_bam_absolute_path) == 1:
         # Assign column names for fold_change_calculator_function outputs in scenario where there are no multiple replicates
-        calculator_output_column_name = ['ChIP Tag Count', 'Control Tag Count', 'Fold Change']
+        calculator_output_column_name = ['ChIP Tag Count', 'Control Tag Count', 'Fold Change', 'Peak Center']
 
     if len(chip_bam_absolute_path) > 1 and len(ctrl_bam_absolute_path) > 1:
         # Assign column names for fold_change_calculator_function outputs in scenario where there are multiple replicates
-        calculator_output_column_name = ['ChIP Tag Count Rep {}'.format(chip_replicate_counter + 1) for chip_replicate_counter in range(len(chip_bam_absolute_path))] + ['Control Tag Count Rep {}'.format(chip_replicate_counter + 1) for chip_replicate_counter in range(len(chip_bam_absolute_path))] + ['Fold Change Rep {}'.format(chip_replicate_counter + 1) for chip_replicate_counter in range(len(chip_bam_absolute_path))]
+        calculator_output_column_name = ['ChIP Tag Count Rep {}'.format(chip_replicate_counter + 1) for chip_replicate_counter in range(len(chip_bam_absolute_path))] + ['Control Tag Count Rep {}'.format(chip_replicate_counter + 1) for chip_replicate_counter in range(len(chip_bam_absolute_path))] + ['Fold Change Rep {}'.format(chip_replicate_counter + 1) for chip_replicate_counter in range(len(chip_bam_absolute_path))] + ['Peak Center Rep {}'.format(chip_replicate_counter + 1) for chip_replicate_counter in range(len(chip_bam_absolute_path))]
 
 
 
@@ -399,7 +407,7 @@ if __name__ == '__main__':
         # Returns ChIP read depth, control read depth, and fold change value at the weighted peak center of each peak
         # Only for transcription factor target protein sample (narrow peaks)
         if peak_type == 'narrow':
-            chip_tag_count_list, ctrl_tag_count_list, fold_change_list = zip(*pool_calculator.map(fold_change_calculator_function_narrow, peak_df['Peak ID']))
+            chip_tag_count_list, ctrl_tag_count_list, fold_change_list, peak_center_list = zip(*pool_calculator.map(fold_change_calculator_function_narrow, peak_df['Peak ID']))
         
 
         # Takes in a list of each peak's chromosomal location codes (chr:start-end)
@@ -408,7 +416,9 @@ if __name__ == '__main__':
         # Only for histone modifier target protein sample (broad peaks)
         if peak_type == 'broad':
             chip_tag_count_list, ctrl_tag_count_list, fold_change_list = zip(*pool_calculator.map(fold_change_calculator_function_broad, peak_df['Peak ID']))
-    
+            peak_center_df = (0.5 * (peak_df['Start'] + peak_df['End'])).round(0)
+            peak_center_list = peak_center_df.values.tolist()
+
         pool_calculator.close()
         pool_calculator.join()
 
@@ -422,6 +432,7 @@ if __name__ == '__main__':
             peak_df['ChIP Tag Count']       = chip_tag_count_list
             peak_df['Control Tag Count']    = ctrl_tag_count_list
             peak_df['Fold Change']          = fold_change_list
+            peak_df['Peak Center']          = peak_center_list
 
         if len(chip_bam_absolute_path) > 1 and len(ctrl_bam_absolute_path) > 1:
             # Save the current fold_change_calculator_function outputs in their 
@@ -429,6 +440,7 @@ if __name__ == '__main__':
             peak_df['ChIP Tag Count Rep {}'.format(chip_replicate_counter + 1)]     = chip_tag_count_list
             peak_df['Control Tag Count Rep {}'.format(chip_replicate_counter + 1)]  = ctrl_tag_count_list
             peak_df['Fold Change Rep {}'.format(chip_replicate_counter + 1)]        = fold_change_list
+            peak_df['Peak Center Rep {}'.format(chip_replicate_counter + 1)]        = peak_center_list
 
 
 
