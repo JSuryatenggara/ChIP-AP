@@ -447,20 +447,22 @@ update_counter = 0
 for program in program_update_check_list:
     
     try:
-    remote_file = requests.get('{}/{}'.format(remote_directory, program))
+        remote_file = requests.get('{}/{}'.format(remote_directory, program))
+
+    except:
+        print('{} is no longer required in the latest implementation of ChIP-AP'.format(program.split('/')[-1]))
+        continue
+        
+    try:
+        local_file = open('{}/{}'.format(local_directory, program), 'r')
 
     except:
         print('WARNING: {} is not found in your local system'.format(program.split('/')[-1]))
-        
-    try:
-    local_file = open('{}/{}'.format(local_directory, program), 'r')
+        continue
 
-    except:
-        print('WARNING: {} is not found in your local system'.format(program.split('/')[-1]))    
 
     if remote_file.text == local_file.read():
         print('{} is up to date'.format(program.split('/')[-1]))
-        pass
 
     elif remote_file.text != local_file.read():
         update_counter += 1
