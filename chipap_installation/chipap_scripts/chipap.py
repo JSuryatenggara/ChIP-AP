@@ -175,6 +175,8 @@ import numpy as np
 from shutil import which
 import pandas as pd
 import requests
+import pathlib
+
 
 print('Defining functions')
 
@@ -404,7 +406,7 @@ if args.ref == 'sacCer3':
     genome_ref = 'sacCer3' # For yeast samples
 
 home_dir = os.path.expanduser('~') # Absolute path to the user's home directory
-root_dir = os.path.expanduser('/') # Absolte path to the root directory
+root_dir = os.path.expanduser('/') # Absolute path to the root directory
 
 # Assigning a general number of threads to be used by all called function in the suite
 # If not user-determined, the suite will use all available processing cores available in the system where it is run
@@ -421,7 +423,7 @@ current_dir = os.getcwd()
 
 remote_directory = 'https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/chipap_installation'
 
-chipap_scripts_dir = os.getcwd()
+chipap_scripts_dir = str(pathlib.Path(__file__).parent.absolute())
 chipap_installation_dir = '/'.join((chipap_scripts_dir.split('/'))[:-1])
 local_directory = chipap_installation_dir
 
@@ -434,11 +436,10 @@ program_update_check_list = ['chipap_scripts/chipap.py',
                             'chipap_scripts/pathway_annotator.py',
                             'chipap_scripts/peak_caller_stats_calculator.py',
                             'chipap_scripts/meme_sequence_extractor.py',
+                            'default_settings_table.tsv',
                             'chipap_env_linux.yml',
                             'chipap_env_macos.yml',
-                            'chipap_installer.py'
-                            'chipap_scripts',
-                            'default_settings_table.tsv',
+                            'chipap_installer.py',
                             'homer_genome_update.sh']
 
 
