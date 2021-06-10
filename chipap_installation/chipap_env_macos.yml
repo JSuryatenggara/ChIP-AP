@@ -1,5 +1,6 @@
-name: python3_chipap
+name: chipap_env_macos_v2.0
 channels:
+  - <unknown>
   - conda-forgE
   - bioconda
   - conda-forge
@@ -79,6 +80,7 @@ dependencies:
   - macs2=2.2.7.1=py37h819e570_2
   - make=4.3=h22f3db7_1
   - matplotlib-base=3.3.4=py37haa7e288_0
+  - meme=5.3.0=py27pl5262hfee0bd2_2
   - mpc=1.1.0=ha57cd0f_1009
   - mpfr=4.0.2=h72d8aaf_1
   - ncurses=6.2=h2e338ed_4

@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 #pyright: reportUnboundVariable=false
 
+
+# script_version = '5.0'
+
+
 # A fully automated ChIP-seq pipeline, processes raw sequencing reads (or aligned reads),
 #   identifies potential protein binding sites, augment them with related informations,
 #   and finally compile everything in one comprehensive, spreadsheet-compatible, complete list.
@@ -107,7 +111,55 @@
 #
 #   Version 4.1     fastQC's -q argument is moved to default_settings_table to enable user receive terminal progress updates on demand
 #                   Fixed a bug where HOMER annotatePeaks.pl does not take custom arguments from settings table
-
+#
+#   Version 4.2     Peak type "unsure" is now available as an optional argument for the --peak flag.
+#                       When peak type is "unsure", ChIP-AP will run twice, sequentially, not altogether.
+#                       First run with narrow peak type settings. Second run with broad peak type settings.
+#                       First run will be stored in folder [setname]_narrow, and second run folder [setname]_broad
+#                       The same settings table will be used for both runs. Default settings table is recommended.
+#
+#   Version 5.0     Motif enrichment analysis by HOMER and MEME are now intergrated into ChIP-AP pipeline
+#                       ChIP-AP now is able to run motif enrichment analysis based on the consensus and/or union sets of the detected peaks
+#                           HOMER's findMotifsGenome.pl module performs the first motif enrichment analysis
+#                               Only available when processing narrow peaks dataset (--peak narrow)
+#                               Will be performed when user includes --homer_motif [consensus/union/both] flag argument in ChIP-AP command line
+#                               The results will stored in a new folder 24_homer_motif_enrichment
+#                           MEME's meme-chip module performs the second motif enrichment analysis  
+#                               Only available when processing narrow peaks dataset (--peak narrow)
+#                               Will be performed when user includes --meme_motif [consensus/union/both] flag argument in ChIP-AP command line
+#                               The results will stored in a new folder 25_meme_motif_enrichment
+#                       fold_change_calculator_suite_3.0.py replaces the older fold_change_calculator_suite_2.1.py
+#                           Now adds each replicate's peak center coordinate into the resulting file: setname_all_peaks_calculated.tsv
+#                           Weighted peak center coordinate for narrow peak type, and simply peak mid-point coordinate for broad peak type
+#                           Weighted peak center coordinate value is needed for the new script meme_sequence_extractor_5.0.py
+#                       A home-made script meme_sequence_extractor_5.0.py is added into the pipeline
+#                           Needed for automated preparation of meme-chip FASTA-formatted target and background inputs
+#                           Recognizes and processes multiple replicates separately (based on each weighted peak center coordinate) 
+#                           meme-chip follows up by processing each replicate separately, generating respective results for each replicate
+#                           Only when ChIP and control aligned reads (.bam) files are not merged or force-merged
+#                       chipap_dashboard_2.0.py replaces the older chipap_dashboard.py (1.0)
+#                           Now supports unsure peak type
+#                           Now supports motif enrichment analysis by HOMER and MEME
+#                           Now supports real time detection of manually typed-in sample table, settings table, and known motifs file
+#                       chipap_wizard_2.0.py replaces the older chipap_wizard.py (1.0)
+#                           Now supports unsure peak type
+#                           Now supports motif enrichment analysis by HOMER and MEME
+#                           Now supports real time detection of manually typed-in sample table, settings table, and known motifs file  
+#                           A few minor tweaks on the data inputting flow
+#                       For consistencies in codes between different versions of scripts, versions are removed from script file name
+#                           Also the phrase "suite" in several scripts does not really make sense, so we removed them
+#                               chipap_v5.0.py --> chipap.py
+#                               Genrich_1.0.py --> Genrich.py
+#                               fold_change_calculator_suite_3.0.py --> fold_change_calculator.py
+#                               meme_sequence_extractor_5.0.py --> meme_sequence_extractor.py
+#                               GO_annotate_suite_1.1.py --> GO_annotator.py
+#                               pathway_annotate_suite_1.1.py --> pathway_annotator.py
+#                               peak_caller_stats_suite.py --> peak_caller_stats_calculator.py
+#                               chipap_dashboard_2.0.py --> chipap_dashboard.py
+#                               chipap_wizard_2.0.py --> chipap_wizard.py
+#                       File default_settings_table has been renamed to default_settings_table.tsv to better reflect its table format
+#                       Software update check implemented at the beginning of pipeline.
+#                           Informing users of newer version of ChIP-AP script(s) available for download on GitHub.
 
 # Import required modules
 print('Importing required modules')
@@ -116,24 +168,14 @@ from os.path import dirname as up
 import argparse
 import os
 import errno
-import csv
-import sys
 import math
 import multiprocessing
 import subprocess
-import time
 import numpy as np
 from shutil import which
-from distutils.spawn import find_executable
-# try:
-#     import pandas as pd
-# except ImportError:
-#     print("Dependency missing, downloading and installing now")
-#     import pip
-#     pip.main(['install', '--user', 'pandas'])
-#     time.sleep(5) # Sleep for 3 seconds
-
 import pandas as pd
+import requests
+import pathlib
 
 
 print('Defining functions')
@@ -241,8 +283,8 @@ parser.add_argument('--mode',
                     choices = ['single', 'paired'])
 
 parser.add_argument('--peak', 
-                    help = '<Optional> Peak type. Narrow peaks for transcription factors (default). Broad peaks for histone modifiers.',
-                    choices = ['narrow', 'broad'],
+                    help = '<Optional> Peak type. Narrow peaks for transcription factors (default). Broad peaks for histone modifiers. Pick unsure if peak type is unknown (ChIP-AP will run in both narrow and broad modes, separately)',
+                    choices = ['narrow', 'broad', 'unsure'],
                     default = 'narrow')
 
 parser.add_argument('--genome', 
@@ -299,6 +341,14 @@ parser.add_argument('--pathann',
                     help = '<Optional> Use to annotate peaks with all common pathways, interactions, and occurences.', 
                     action = 'store_true')
 
+parser.add_argument('--homer_motif', 
+                    help = '<Optional> Use to perform motif enrichment analysis on selected peak set with HOMER motif analysis suite.', 
+                    choices = ['consensus', 'union', 'both'])
+
+parser.add_argument('--meme_motif', 
+                    help = '<Optional> Use to perform motif enrichment analysis on selected peak set with MEME motif analysis suite.', 
+                    choices = ['consensus', 'union', 'both'])
+
 parser.add_argument('--thread', 
                     help = '<Optional> Maximum number of processes to use. Default is half the maximum available.', 
                     type = int, 
@@ -318,21 +368,28 @@ args = parser.parse_args()
 
 
 
+########################################################################################################################
+### PARSED FLAG ARGUMENTS VARIABLE ASSIGNMENT
+########################################################################################################################
+
 # Assign parsed arguments into variables
 print('Parsing arguments')
+chipap_program_name = 'chipap.py'
+
 dataset_name = args.setname # Resulting files will be named based in this
 read_mode = args.mode # Sequencing read mode of the fastq files. Single-end or paired-end
-peak_type = args.peak # Experiment-dependent peak type. Narrow for TF peaks. Broad for histone modifier peaks.
+peak_type = args.peak # Experiment-dependent peak type. Narrow for TF peaks. Broad for histone modifier peaks. Unsure if unknown (will run both narrow and broad modes).
 
 genome_dir = os.path.abspath(args.genome) # Absolute path to the genome folder
+output_folder = os.path.abspath(args.output) # Absolute path to the folder [dataset_name] that contains all the outputs of the suite
 output_dir = '{}/{}'.format(os.path.abspath(args.output), dataset_name) # Absolute path to all the outputs of the suite
 
 # Known motif for the target IP protein is assigned here. If no motif was assigned, 
 #   all motif overlaps number will be all zero later in the analysis
 if args.motif:
-    motif_file_name = os.path.abspath(args.motif) # Absolte path to the .motif file (HOMER motif matrix file)
+    motif_file_full_path = os.path.abspath(args.motif) # Absolte path to the .motif file (HOMER motif matrix file)
 if not args.motif:
-    motif_file_name = None
+    motif_file_full_path = None
 
 # Reference genome to be used depending on sample organism. For now, the suite can take in human and mouse samples
 if args.ref == 'hg19':
@@ -349,24 +406,76 @@ if args.ref == 'sacCer3':
     genome_ref = 'sacCer3' # For yeast samples
 
 home_dir = os.path.expanduser('~') # Absolute path to the user's home directory
-root_dir = os.path.expanduser('/') # Absolte path to the root directory
-
-
-
-########################################################################################################################
-### PARSED FLAG ARGUMENTS VARIABLE ASSIGNMENT
-########################################################################################################################
+root_dir = os.path.expanduser('/') # Absolute path to the root directory
 
 # Assigning a general number of threads to be used by all called function in the suite
 # If not user-determined, the suite will use all available processing cores available in the system where it is run
 cpu_count = args.thread
 
-# Creating output directory folder
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
-
 # Getting the directory on which the script was called
 current_dir = os.getcwd()
+
+
+
+########################################################################################################################
+### SOFTWARE UPDATE CHECK
+########################################################################################################################
+
+remote_directory = 'https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/chipap_installation'
+
+chipap_scripts_dir = str(pathlib.Path(__file__).parent.absolute())
+chipap_installation_dir = '/'.join((chipap_scripts_dir.split('/'))[:-1])
+local_directory = chipap_installation_dir
+
+program_update_check_list = ['chipap_scripts/chipap.py',
+                            'chipap_scripts/chipap_dashboard.py',
+                            'chipap_scripts/chipap_wizard.py',
+                            'chipap_scripts/Genrich.py',
+                            'chipap_scripts/fold_change_calculator.py',
+                            'chipap_scripts/GO_annotator.py',
+                            'chipap_scripts/pathway_annotator.py',
+                            'chipap_scripts/peak_caller_stats_calculator.py',
+                            'chipap_scripts/meme_sequence_extractor.py',
+                            'chipap_scripts/default_settings_table.tsv',
+                            'chipap_env_linux.yml',
+                            'chipap_env_macos.yml',
+                            'chipap_installer.py',
+                            'homer_genome_update.sh']
+
+
+update_counter = 0
+
+for program in program_update_check_list:
+    
+    try:
+        remote_file = requests.get('{}/{}'.format(remote_directory, program))
+
+    except:
+        print('{} is no longer required in the latest implementation of ChIP-AP'.format(program.split('/')[-1]))
+        continue
+        
+    try:
+        local_file = open('{}/{}'.format(local_directory, program), 'r')
+
+    except:
+        print('WARNING: {} is not found in your local system'.format(program.split('/')[-1]))
+        continue
+
+
+    if remote_file.text == local_file.read():
+        print('{} is up to date'.format(program.split('/')[-1]))
+
+    elif remote_file.text != local_file.read():
+        update_counter += 1
+        print('Newer version of {} is available on our github'.format(program.split('/')[-1]))
+
+
+if update_counter == 0:
+    print('Your ChIP-AP is up to date')
+
+if update_counter > 0:
+    print('{} updates available on our GitHub (https://github.com/JSuryatenggara/ChIP-AP)'.format(update_counter))
+    print('Update all at once by downloading our latest release (https://github.com/JSuryatenggara/ChIP-AP/releases)')
 
 
 
@@ -622,34 +731,32 @@ if args.custom_setting_table:
 
 if not args.custom_setting_table:
     # If not provided, suite will read the default custom settings table, currently provided in the genome folder
-    custom_settings_table_full_path = '{}/default_settings_table'.format(args.genome)
-
-subprocess.run('cp {} {}'.format(custom_settings_table_full_path, output_dir), shell = True)
-custom_settings_table_full_path = '{}/{}'.format(output_dir, custom_settings_table_full_path.split('/')[-1])
+    custom_settings_table_full_path = os.path.abspath('{}/default_settings_table.tsv'.format(args.genome))
 
 custom_settings_table_df        = pd.read_csv(custom_settings_table_full_path, delimiter='\t')
 custom_settings_table_df        = custom_settings_table_df.replace(np.nan, '', regex = True)
 custom_settings_table_header    = custom_settings_table_df.columns.values.tolist()
 
 # List of the programs in the suite, which default settings are subject to be customized by the table.
-suite_program_list = [
-    'fastqc1',
-    'clumpify',
-    'bbduk',
-    'trimmomatic',
-    'fastqc2',
-    'bwa_mem',
-    'samtools_view',
-    'plotfingerprint',
-    'fastqc3',
-    'macs2_callpeak',
-    'gem',
-    'sicer2',
-    'homer_findPeaks',
-    'genrich',
-    'homer_mergePeaks',
-    'homer_annotatePeaks',
-    'fold_change_calculator']
+suite_program_list = ["fastqc1",
+                        "clumpify",
+                        "bbduk",
+                        "trimmomatic",
+                        "fastqc2",
+                        "bwa_mem",
+                        "samtools_view",
+                        "plotfingerprint",
+                        "fastqc3",
+                        "macs2_callpeak",
+                        "gem",
+                        "sicer2",
+                        "homer_findPeaks",
+                        "genrich",
+                        "homer_mergePeaks",
+                        "homer_annotatePeaks",
+                        "fold_change_calculator",
+                        "homer_findMotifsGenome",
+                        "meme_chip"]
 
 # Check the formatting of the custom settings table, to ensure correct program-argument readings.
 # Check if the table consists of two columns 
@@ -687,9 +794,9 @@ for custom_settings_table_array_row in custom_settings_table_array:
         current_custom_settings_table_program = custom_settings_table_array_row[custom_settings_table_program_colnum]
         current_custom_settings_table_argument = custom_settings_table_array_row[custom_settings_table_argument_colnum]
         argument_dict[current_custom_settings_table_program].append(current_custom_settings_table_argument)
-        if current_custom_settings_table_argument != '':
+        if current_custom_settings_table_argument != '' and peak_type != 'unsure':
             # Declare all inserted arguments into the vanilla program call. Inserted = defaults, customs, tweaked defaults.
-            print('Adding "{}" to {} call command as an optional argument'.format(
+            print('Adding "{}" to {} call command as optional argument(s)'.format(
                 current_custom_settings_table_argument, 
                 current_custom_settings_table_program))
 
@@ -712,6 +819,8 @@ genrich_arg                 = ' '.join(argument_dict['genrich'])
 homer_mergePeaks_arg        = ' '.join(argument_dict['homer_mergePeaks'])
 homer_annotatePeaks_arg     = ' '.join(argument_dict['homer_annotatePeaks'])
 fold_change_calculator_arg  = ' '.join(argument_dict['fold_change_calculator'])
+homer_findMotifsGenome_arg  = ' '.join(argument_dict['homer_findMotifsGenome'])
+meme_chip_arg               = ' '.join(argument_dict['meme_chip'])
 
 suite_program_arg = [
     fastqc1_arg,
@@ -730,7 +839,246 @@ suite_program_arg = [
     genrich_arg,
     homer_mergePeaks_arg,
     homer_annotatePeaks_arg,
-    fold_change_calculator_arg]
+    fold_change_calculator_arg,
+    homer_findMotifsGenome_arg,
+    meme_chip_arg]
+
+
+
+########################################################################################################################
+### UNSURE PEAK TYPE --- RUNNING BOTH PEAK TYPE MODES
+########################################################################################################################
+
+read_mode_arg = ' --mode {}'.format(read_mode)
+
+peak_type_arg = ' --peak {}'.format(peak_type)
+
+output_folder_arg = ' --output {}'.format(args.output)
+
+dataset_name_arg = ' --setname {}'.format(dataset_name)
+
+genome_ref_arg = ' --ref {}'.format(genome_ref)
+
+genome_dir_arg = ' --genome {}'.format(genome_dir)
+
+if args.sample_table:
+    sample_table_arg = ' --sample_table {}'.format(samples_table_absolute_path)
+else:
+    sample_table_arg = ''
+
+if args.custom_setting_table:
+    setting_table_arg = ' --custom_setting_table {}'.format(custom_settings_table_full_path)
+else:
+    setting_table_arg = ''
+
+if args.motif:
+    motif_file_arg = ' --motif {}'.format(motif_file_full_path)
+else:
+    motif_file_arg = ''
+
+if args.fcmerge:
+    fcmerge_arg = ' --fcmerge'
+else:
+    fcmerge_arg = ''
+
+if args.goann:
+    goann_arg = ' --goann'
+else:
+    goann_arg = ''
+
+if args.pathann:
+    pathann_arg = ' --pathann'
+else:
+    pathann_arg = ''
+
+if args.homer_motif:
+    homer_motif_arg = ' --homer_motif {}'.format(args.homer_motif)
+else:
+    homer_motif_arg = ''
+
+if args.meme_motif:
+    meme_motif_arg = ' --meme_motif {}'.format(args.meme_motif)
+else:
+    meme_motif_arg = ''
+
+if args.deltemp:
+    deltemp_arg = ' --deltemp'
+else:
+    deltemp_arg = ''
+
+if args.thread:
+    cpu_count_arg = ' --thread {}'.format(cpu_count)
+else:
+    cpu_count_arg = ''
+
+if args.run:
+    run_arg = ' --run'
+else:
+    run_arg = ''
+
+if chip_r1_sample_list:
+    chip_r1_sample_string = ' '.join(chip_r1_sample_list)
+    chip_r1_arg = ' --chipR1 {}'.format(chip_r1_sample_string)
+else:
+    chip_r1_arg = ''
+
+if ctrl_r1_sample_list:
+    ctrl_r1_sample_string = ' '.join(ctrl_r1_sample_list)
+    ctrl_r1_arg = ' --ctrlR1 {}'.format(ctrl_r1_sample_string)
+else:
+    ctrl_r1_arg = ''
+
+if chip_r2_sample_list:
+    chip_r2_sample_string = ' '.join(chip_r2_sample_list)
+    chip_r2_arg = ' --chipR2 {}'.format(chip_r2_sample_string)
+else:
+    chip_r2_arg = ''
+
+if ctrl_r2_sample_list:
+    ctrl_r2_sample_string = ' '.join(ctrl_r2_sample_list)
+    ctrl_r2_arg = ' --ctrlR2 {}'.format(ctrl_r2_sample_string)
+else:
+    ctrl_r2_arg = ''
+
+
+
+# Store the (nigh-identical to the one used) ChIP-AP command line that will produce identical pipeline processes
+if not args.sample_table: # The command line when samples are assigned manually in the command line
+    command_line_string = '{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}'.format(chipap_program_name,
+                                                                                read_mode_arg,
+                                                                                peak_type_arg,
+                                                                                chip_r1_arg,
+                                                                                ctrl_r1_arg,
+                                                                                chip_r2_arg,
+                                                                                ctrl_r2_arg,
+                                                                                output_folder_arg,
+                                                                                dataset_name_arg,
+                                                                                genome_ref_arg,
+                                                                                genome_dir_arg,
+                                                                                setting_table_arg,
+                                                                                motif_file_arg,
+                                                                                fcmerge_arg,
+                                                                                goann_arg,
+                                                                                pathann_arg,
+                                                                                homer_motif_arg,
+                                                                                meme_motif_arg,
+                                                                                deltemp_arg,
+                                                                                cpu_count_arg,
+                                                                                run_arg)
+
+if args.sample_table: # The command line when samples are assigned automatically by loading the sample table
+    command_line_string = '{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}'.format(chipap_program_name,
+                                                                        read_mode_arg,
+                                                                        peak_type_arg,
+                                                                        output_folder_arg,
+                                                                        dataset_name_arg,
+                                                                        genome_ref_arg,
+                                                                        genome_dir_arg,
+                                                                        sample_table_arg,
+                                                                        setting_table_arg,
+                                                                        motif_file_arg,
+                                                                        fcmerge_arg,
+                                                                        goann_arg,
+                                                                        pathann_arg,
+                                                                        homer_motif_arg,
+                                                                        meme_motif_arg,
+                                                                        deltemp_arg,
+                                                                        cpu_count_arg,
+                                                                        run_arg)
+
+print('\nNow processing:')
+print(command_line_string + '\n')
+
+
+
+# When the user type unsure as the peak type, ChIP-AP are designed to run exactly the same command twice
+#   Beginning with a pipeline run under the narrow peak setting (in case the target protein is a transcription factor)
+#   Followed by a pipeline run under the broad peak setting (in case the target protein is a histone modifier)
+if peak_type == 'unsure':
+
+    if dataset_name:
+        dataset_name_arg = ' --setname {}_narrow'.format(dataset_name)
+    else:
+        dataset_name_arg = ''
+
+    # Generate narrow peak command line based on the original command line typed in by the user
+    narrow_command_line_string = '{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}'.format(chipap_program_name,
+                                                                                    read_mode_arg,
+                                                                                    ' --peak narrow',
+                                                                                    chip_r1_arg,
+                                                                                    ctrl_r1_arg,
+                                                                                    chip_r2_arg,
+                                                                                    ctrl_r2_arg,
+                                                                                    output_folder_arg,
+                                                                                    dataset_name_arg,
+                                                                                    genome_ref_arg,
+                                                                                    genome_dir_arg,
+                                                                                    setting_table_arg,
+                                                                                    motif_file_arg,
+                                                                                    fcmerge_arg,
+                                                                                    goann_arg,
+                                                                                    pathann_arg,
+                                                                                    homer_motif_arg,
+                                                                                    meme_motif_arg,
+                                                                                    deltemp_arg,
+                                                                                    cpu_count_arg,
+                                                                                    run_arg)
+
+
+
+    results_dir = '{}/{}_narrow/08_results'.format(output_folder, dataset_name)
+
+    # Get the sample filenames from the narrow peak pipeline
+    unsure_broad_chip_name = ['{}_narrow_chip_rep{}'.format(dataset_name, list_counter+1) for list_counter in range(len(chip_r1_original_name))]
+    unsure_broad_ctrl_name = ['{}_narrow_ctrl_rep{}'.format(dataset_name, list_counter+1) for list_counter in range(len(ctrl_r1_original_name))]
+
+    # Assign the aligned reads file of the narrow peak pipeline as the samples for the broad peak pipeline
+    unsure_broad_chip_list = ['{}/{}.bam'.format(results_dir, unsure_broad_chip_name[list_counter]) for list_counter in range(len(unsure_broad_chip_name))]
+    unsure_broad_ctrl_list = ['{}/{}.bam'.format(results_dir, unsure_broad_ctrl_name[list_counter]) for list_counter in range(len(unsure_broad_ctrl_name))]
+    unsure_broad_chip_string = ' '.join(unsure_broad_chip_list)
+    unsure_broad_ctrl_string = ' '.join(unsure_broad_ctrl_list)
+
+    chip_r1_arg = ' --chipR1 {}'.format(unsure_broad_chip_string)
+    ctrl_r1_arg = ' --ctrlR1 {}'.format(unsure_broad_ctrl_string)
+    chip_r2_arg = ''
+    ctrl_r2_arg = ''
+
+    if dataset_name:
+        dataset_name_arg = ' --setname {}_broad'.format(dataset_name)
+    else:
+        dataset_name_arg = ''
+
+    # Generate broad peak command line that takes over the processes after the aligned reads are generated by the preceding narrow peak pipeline
+    # In order to not waste time and resources repeating the processes upstream, as they will produce exacty the same results as the narrow peak pipeline
+    broad_command_line_string = '{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}'.format(chipap_program_name,
+                                                                                    read_mode_arg,
+                                                                                    ' --peak broad',
+                                                                                    chip_r1_arg,
+                                                                                    ctrl_r1_arg,
+                                                                                    chip_r2_arg,
+                                                                                    ctrl_r2_arg,
+                                                                                    output_folder_arg,
+                                                                                    dataset_name_arg,
+                                                                                    genome_ref_arg,
+                                                                                    genome_dir_arg,
+                                                                                    setting_table_arg,
+                                                                                    motif_file_arg,
+                                                                                    fcmerge_arg,
+                                                                                    goann_arg,
+                                                                                    pathann_arg,
+                                                                                    homer_motif_arg,
+                                                                                    meme_motif_arg,
+                                                                                    deltemp_arg,
+                                                                                    cpu_count_arg,
+                                                                                    run_arg)
+
+    # Run the narrow peak pipeline first (results stored under the folder [setname]_narrow)
+    subprocess.run(narrow_command_line_string, shell = True)
+
+    # Then follow up by running the broad peak pipeline (results stored under the folder [setname]_broad)
+    subprocess.run(broad_command_line_string, shell = True)
+
+    exit()
 
 
 
@@ -857,12 +1205,12 @@ if check_program('Genrich') is False:
     print('Pre-run test of Genrich failed. Please try running Genrich individually to check for the problem')
     error_status = 1
 
-if which('Genrich_1.0.py') is None:
-    print('Please make sure Genrich_1.0.py is installed, in PATH, and marked as executable')
+if which('Genrich.py') is None:
+    print('Please make sure Genrich.py is installed, in PATH, and marked as executable')
     error_status = 1 
 
-if check_program('Genrich_1.0.py') is False:
-    print('Pre-run test of Genrich_1.0.py failed. Please try running Genrich_1.0.py individually to check for the problem')
+if check_program('Genrich.py') is False:
+    print('Pre-run test of Genrich.py failed. Please try running Genrich.py individually to check for the problem')
     error_status = 1
 
 if which('mergePeaks') is None:
@@ -881,36 +1229,60 @@ if check_program('annotatePeaks.pl') is False:
     print('Pre-run test of annotatePeaks.pl failed. Please try running HOMER annotatePeaks.pl individually to check for the problem')
     error_status = 1
 
-if which('fold_change_calculator_suite_2.1.py') is None:
-    print('Please make sure fold_change_calculator_suite_2.1.py is installed, in PATH, and marked as executable')
+if which('fold_change_calculator.py') is None:
+    print('Please make sure fold_change_calculator.py is installed, in PATH, and marked as executable')
     error_status = 1 
 
-if check_program('fold_change_calculator_suite_2.1.py') is False:
-    print('Pre-run test of fold_change_calculator_suite_2.1.py failed. Please try running fold_change_calculator_suite_2.1.py individually to check for the problem')
+if check_program('fold_change_calculator.py') is False:
+    print('Pre-run test of fold_change_calculator.py failed. Please try running fold_change_calculator.py individually to check for the problem')
     error_status = 1
 
-if which('peak_caller_stats_suite.py') is None:
-    print('Please make sure peak_caller_stats_suite.py is installed, in PATH, and marked as executable')
+if which('peak_caller_stats_calculator.py') is None:
+    print('Please make sure peak_caller_stats_calculator.py is installed, in PATH, and marked as executable')
     error_status = 1 
 
-if check_program('peak_caller_stats_suite.py') is False:
-    print('Pre-run test of peak_caller_stats_suite.py failed. Please try running peak_caller_stats_suite.py individually to check for the problem')
+if check_program('peak_caller_stats_calculator.py') is False:
+    print('Pre-run test of peak_caller_stats_calculator.py failed. Please try running peak_caller_stats_calculator.py individually to check for the problem')
     error_status = 1
 
-if which('GO_annotate_suite_1.1.py') is None:
-    print('Please make sure GO_annotate_suite_1.1.py is installed, in PATH, and marked as executable')
+if which('GO_annotator.py') is None:
+    print('Please make sure GO_annotator.py is installed, in PATH, and marked as executable')
     error_status = 1 
 
-if check_program('GO_annotate_suite_1.1.py') is False:
-    print('Pre-run test of GO_annotate_suite_1.1.py failed. Please try running GO_annotate_suite_1.1.py individually to check for the problem')
+if check_program('GO_annotator.py') is False:
+    print('Pre-run test of GO_annotator.py failed. Please try running GO_annotator.py individually to check for the problem')
     error_status = 1
 
-if which('pathway_annotate_suite_1.1.py') is None:
-    print('Please make sure pathway_annotate_suite_1.1.py is installed, in PATH, and marked as executable')
+if which('pathway_annotator.py') is None:
+    print('Please make sure pathway_annotator.py is installed, in PATH, and marked as executable')
     error_status = 1 
 
-if check_program('pathway_annotate_suite_1.1.py') is False:
-    print('Pre-run test of pathway_annotate_suite_1.1.py failed. Please try running pathway_annotate_suite_1.1.py individually to check for the problem')
+if check_program('pathway_annotator.py') is False:
+    print('Pre-run test of pathway_annotator.py failed. Please try running pathway_annotator.py individually to check for the problem')
+    error_status = 1
+
+if which('findMotifsGenome.pl') is None:
+    print('Please make sure HOMER is installed, in PATH, and marked as executable')
+    error_status = 1 
+
+if check_program('findMotifsGenome.pl') is False:
+    print('Pre-run test of findMotifsGenome.pl failed. Please try running HOMER findMotifsGenome.pl individually to check for the problem')
+    error_status = 1
+
+if which('meme_sequence_extractor.py') is None:
+    print('Please make sure meme_sequence_extractor.py is installed, in PATH, and marked as executable')
+    error_status = 1 
+
+if check_program('meme_sequence_extractor.py') is False:
+    print('Pre-run test of meme_sequence_extractor.py failed. Please try running meme_sequence_extractor.py individually to check for the problem')
+    error_status = 1
+
+if which('meme-chip') is None:
+    print('Please make sure MEME is installed, in PATH, and marked as executable')
+    error_status = 1 
+
+if check_program('meme-chip') is False:
+    print('Pre-run test of meme-chip failed. Please try running meme-chip individually to check for the problem')
     error_status = 1
 
 if not os.path.isfile('{}/bbmap/adapters.fa'.format(genome_dir)):
@@ -945,6 +1317,8 @@ if error_status == 1:
  
 
 
+
+
 # Every script has #!/bin/bash on top to let the shell know which interpreter to run on the corresponding script
 # Every script has set -euxo pipefail following #!/bin/bash to make the scripts run safer (for now)
 # The -e option will cause a bash script to exit immediately when a command fails
@@ -953,9 +1327,13 @@ if error_status == 1:
 # The -u option causes the bash shell to treat unset variables as an error and exit immediately
 # The -x option causes bash to print each command before executing it. For debugging. Will remove from the finished product.
 
+# Creating output directory folder
+print('Creating output directory folder')
+
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
 print('Generating bash scripts')
-
-
 
 ########################################################################################################################
 ### 00_raw_data_script.sh
@@ -1240,7 +1618,9 @@ command_line_file_name = '{}/{}_command_line.txt'.format(output_dir, dataset_nam
 
 command_line_file = open(command_line_file_name, 'w')
 
-command_line_file.write(' '.join(sys.argv) + '\n')
+command_line_file.write((command_line_string) + '\n')
+
+command_line_file.close() # Closing the file '{dataset_name}_command_line.txt'. Flushing the write buffer
 
 
 
@@ -1265,6 +1645,8 @@ setting_table_output_dict = {'program' : suite_program_list, 'argument' : suite_
 setting_table_output_df = pd.DataFrame.from_dict(setting_table_output_dict)
 
 setting_table_output_df.to_csv('{}/{}_setting_table.tsv'.format(output_dir, dataset_name), sep = '\t', index = False)
+
+
 
 ####################################################################################################################
 ### 01_raw_reads_quality_control_script.sh
@@ -2177,7 +2559,7 @@ if start_from_bam == True:
 
 
 
-# When force_merge mode is on, the merged ChIP and control .bam files are generated as an input for fold_change_calculator_suite_2.1.py
+# When force_merge mode is on, the merged ChIP and control .bam files are generated as an input for fold_change_calculator.py
 # When peak_type is 'broad', the merged ChIP and control .bam files are generated as an input for SICER2 peak calling
 if force_merge == 1 or peak_type == 'broad':
     # See comments at the top: force merge == 1 means the fold change analysis later on 
@@ -2223,7 +2605,7 @@ for list_counter in range(len(ctrl_name)):
         ctrl_name[list_counter]))
 
 
-# When force_merge mode is on, the merged ChIP and control .bam files are generated as an input for fold_change_calculator_suite_2.1.py
+# When force_merge mode is on, the merged ChIP and control .bam files are generated as an input for fold_change_calculator.py
 # When peak_type is 'broad', the merged ChIP and control .bam files are generated as an input for SICER2 peak calling
 if force_merge == 1 or peak_type == 'broad':
     # See comments at the top: force merge == 1 means the fold change analysis later on 
@@ -2272,7 +2654,7 @@ results_script.write('plotFingerprint {} -p {} -b {} -l {} -o {}/fingerprint_plo
     dataset_name))
 
 
-# When force_merge mode is on, the merged ChIP and control .bam files are generated as an input for fold_change_calculator_suite_2.1.py
+# When force_merge mode is on, the merged ChIP and control .bam files are generated as an input for fold_change_calculator.py
 # When peak_type is 'broad', the merged ChIP and control .bam files are generated as an input for SICER2 peak calling
 if force_merge == 1 or peak_type == 'broad':
     # See comments at the top: force merge == 1 means the fold change analysis later on 
@@ -2333,7 +2715,7 @@ for list_counter in range(len(ctrl_name)):
         ctrl_name[list_counter]))
 
 
-# When force_merge mode is on, the merged ChIP and control .bam files are generated as an input for fold_change_calculator_suite_2.1.py
+# When force_merge mode is on, the merged ChIP and control .bam files are generated as an input for fold_change_calculator.py
 # When peak_type is 'broad', the merged ChIP and control .bam files are generated as an input for SICER2 peak calling
 if force_merge == 1 or peak_type == 'broad':
     # See comments at the top: force merge == 1 means the fold change analysis later on 
@@ -2427,7 +2809,7 @@ for list_counter in range(len(ctrl_name)):
         aligned_reads_quality_control_dir))
 
 
-# When force_merge mode is on, the merged ChIP and control .bam files are generated as an input for fold_change_calculator_suite_2.1.py
+# When force_merge mode is on, the merged ChIP and control .bam files are generated as an input for fold_change_calculator.py
 # When peak_type is 'broad', the merged ChIP and control .bam files are generated as an input for SICER2 peak calling
 if force_merge == 1 or peak_type == 'broad':
 
@@ -2814,7 +3196,7 @@ genrich_ctrl_string = ' '.join(genrich_ctrl_list)
 #   The -y flag is used in single mode so that Genrich will keep them.
 # -v flag was used in both read modes just so Genrich will print status updates to the stderr channel 
 if read_mode == 'single':
-    genrich_peak_calling_script.write('Genrich_1.0.py --mode {} -y -t {} -o {}/{}_Genrich.narrowPeak -c {} {} 1> {}/logs/{}.Genrich.out 2> {}/logs/{}.Genrich.err\n\n'.format(
+    genrich_peak_calling_script.write('Genrich.py --mode {} -y -t {} -o {}/{}_Genrich.narrowPeak -c {} {} 1> {}/logs/{}.Genrich.out 2> {}/logs/{}.Genrich.err\n\n'.format(
         read_mode,
         genrich_chip_string, 
         genrich_dir, 
@@ -2827,7 +3209,7 @@ if read_mode == 'single':
         dataset_name))
 
 elif read_mode == 'paired':
-    genrich_peak_calling_script.write('Genrich_1.0.py --mode {} -t {} -o {}/{}_Genrich.narrowPeak -c {} {} 1> {}/logs/{}.Genrich.out 2> {}/logs/{}.Genrich.err\n\n'.format(
+    genrich_peak_calling_script.write('Genrich.py --mode {} -t {} -o {}/{}_Genrich.narrowPeak -c {} {} 1> {}/logs/{}.Genrich.out 2> {}/logs/{}.Genrich.err\n\n'.format(
         read_mode,
         genrich_chip_string, 
         genrich_dir, 
@@ -3003,8 +3385,6 @@ peaks_merging_script.close() # Closing the script '21_peaks_merging_script.sh'. 
 #   in .tsv format that can be easily viewed, sorted, and filtered in spreadsheet applications.
 # The script will also generate a separate summary custom_setting_table file that shows 
 #   the statistics of peaks that are called each combination of peak callers.
-# To avoid humongous file size from being generated downstream the analysis, 
-#   this script will also filter out all peaks that are exclusively called only by one peak caller.
 # In: setname_merged_peaks* (multiple files) (output from 21_peaks_merging_script.sh)
 # Out: setname_all_peaks_calculated.tsv (input for 23_go_annotation_script.sh or 
 #   23_pathway_annotation_script.sh or 23_go_pathway_annotation_script.sh)
@@ -3031,7 +3411,7 @@ peaks_processing_script.write('annotatePeaks.pl {} {}/{}_all_peaks_concatenated.
     peaks_processing_dir, 
     dataset_name, 
     genome_ref, 
-    motif_file_name, 
+    motif_file_full_path, 
     peaks_processing_dir, 
     dataset_name, 
     peaks_processing_dir, 
@@ -3049,9 +3429,9 @@ if force_merge == 0:
     fcc_chip_string = ' '.join(fcc_chip_list)
     fcc_ctrl_string = ' '.join(fcc_ctrl_list)
 
-    # Bash commands to call the home-made script fold_change_calculator_suite_2.1.py 
+    # Bash commands to call the home-made script fold_change_calculator.py 
     #   to append tag counts, fold changes, motif hits, and peak caller overlaps stats to each peak
-    peaks_processing_script.write('fold_change_calculator_suite_2.1.py {} --thread {} --input_tsv {}/{}_all_peaks_annotated.tsv --output_tsv {}/{}_all_peaks_calculated.tsv --chip_bam {} --ctrl_bam {}\n\n'.format(
+    peaks_processing_script.write('fold_change_calculator.py {} --thread {} --input_tsv {}/{}_all_peaks_annotated.tsv --output_tsv {}/{}_all_peaks_calculated.tsv --chip_bam {} --ctrl_bam {}\n\n'.format(
         fold_change_calculator_arg,
         cpu_count, 
         peaks_processing_dir, 
@@ -3064,9 +3444,9 @@ if force_merge == 0:
 if force_merge == 1:
     # See comments at the top, force merge == 1 means the fold change analysis later on 
     #   will be calculated solely based on merged ChIP .bam and merged control .bam files
-    # Bash commands to call the home-made script fold_change_calculator_suite_2.1.py 
+    # Bash commands to call the home-made script fold_change_calculator.py 
     #   to append tag counts, fold changes, motif hits, and peak caller overlaps stats to each peak
-    peaks_processing_script.write('fold_change_calculator_suite_2.1.py {} --thread {} --peak {} --input_tsv {}/{}_all_peaks_annotated.tsv --output_tsv {}/{}_all_peaks_calculated.tsv --chip_bam {}/{}_chip_merged.bam --ctrl_bam {}/{}_ctrl_merged.bam\n\n'.format(
+    peaks_processing_script.write('fold_change_calculator.py {} --thread {} --peak {} --input_tsv {}/{}_all_peaks_annotated.tsv --output_tsv {}/{}_all_peaks_calculated.tsv --chip_bam {}/{}_chip_merged.bam --ctrl_bam {}/{}_ctrl_merged.bam\n\n'.format(
         fold_change_calculator_arg, 
         cpu_count, 
         peak_type,
@@ -3079,11 +3459,11 @@ if force_merge == 1:
         results_dir, 
         dataset_name))
 
-# Bash commands to call the home-made script peak_caller_stats_suite.py to generate 
+# Bash commands to call the home-made script peak_caller_stats_calculator.py to generate 
 #   a separate summary custom_setting_table file that shows the statistics 
 #   (tag counts, fold changes, motif hits, motif hits rate, positive peaks rate) 
 #   of peaks that are called each combination of peak callers
-peaks_processing_script.write('peak_caller_stats_suite.py {}/{}_all_peaks_calculated.tsv {}/{}_peak_caller_combinations_statistics.tsv\n\n'.format(
+peaks_processing_script.write('peak_caller_stats_calculator.py {}/{}_all_peaks_calculated.tsv {}/{}_peak_caller_combinations_statistics.tsv\n\n'.format(
     peaks_processing_dir, 
     dataset_name, 
     peaks_processing_dir, 
@@ -3108,7 +3488,7 @@ supplementary_annotations_dir = '{}/23_supplementary_annotations'.format(output_
 if not os.path.exists(supplementary_annotations_dir):
     os.makedirs(supplementary_annotations_dir)
 
-# Create a script "23_go_annotation_script.sh" within, that will iterates through various HOMER 
+# Create a script "23_go_annotation_script.sh" within, that will iterate through various HOMER 
 #   gene ontology database (resulting from HOMER annotatePeaks.pl program call with -go flag toggled on) 
 #   and append every relevant gene ontology terms to each peak)
 # In: setname_all_peaks_calculated.tsv (input from 22_peaks_processing_script.sh)
@@ -3121,9 +3501,9 @@ go_annotation_script = open(go_annotation_script_name, 'w')
 go_annotation_script.write('#!/bin/bash\n\n')
 go_annotation_script.write('set -euxo pipefail\n\n')
 
-# Bash commands to call the home-made script GO_annotate_suite_1.1.py that is appending to each peak 
+# Bash commands to call the home-made script GO_annotator.py that is appending to each peak 
 #   all gene ontology terms with the same Entrez ID as the peak 
-go_annotation_script.write('GO_annotate_suite_1.1.py --thread {} --input_tsv {}/{}_all_peaks_calculated.tsv --output_tsv {}/{}_all_peaks_GO_annotated.tsv --go_folder {}/{}_gene_ontology \n\n'.format(
+go_annotation_script.write('GO_annotator.py --thread {} --input_tsv {}/{}_all_peaks_calculated.tsv --output_tsv {}/{}_all_peaks_GO_annotated.tsv --go_folder {}/{}_gene_ontology\n\n'.format(
     cpu_count, 
     peaks_processing_dir, 
     dataset_name, 
@@ -3136,7 +3516,7 @@ go_annotation_script.close() # Closing the script '23_go_annotation_script.sh'. 
 
 
 
-# Create a script "23_pathway_annotation_script.sh" within, that will iterates through various HOMER 
+# Create a script "23_pathway_annotation_script.sh" within, that will iterate through various HOMER 
 #   database (resulting from HOMER annotatePeaks.pl program call with -go flag toggled on) 
 #   and append every relevant pathways, cooccurences, and interactions to each peak)
 # In: setname_all_peaks_calculated.tsv (input from 22_peaks_processing_script.sh)
@@ -3149,9 +3529,9 @@ pathway_annotation_script = open(pathway_annotation_script_name, 'w')
 pathway_annotation_script.write('#!/bin/bash\n\n')
 pathway_annotation_script.write('set -euxo pipefail\n\n')
 
-# Bash commands to call the home-made script pathway_annotate_suite_1.1.py that is appending to each peak 
+# Bash commands to call the home-made script pathway_annotator.py that is appending to each peak 
 #   all pathways, occurences, and interactions with the same Entrez ID as the peak 
-pathway_annotation_script.write('pathway_annotate_suite_1.1.py --thread {} --input_tsv {}/{}_all_peaks_calculated.tsv --output_tsv {}/{}_all_peaks_pathway_annotated.tsv --go_folder {}/{}_gene_ontology \n\n'.format(
+pathway_annotation_script.write('pathway_annotator.py --thread {} --input_tsv {}/{}_all_peaks_calculated.tsv --output_tsv {}/{}_all_peaks_pathway_annotated.tsv --go_folder {}/{}_gene_ontology\n\n'.format(
     cpu_count, 
     peaks_processing_dir, 
     dataset_name, 
@@ -3179,8 +3559,8 @@ go_pathway_annotation_script = open(go_pathway_annotation_script_name, 'w')
 go_pathway_annotation_script.write('#!/bin/bash\n\n')
 go_pathway_annotation_script.write('set -euxo pipefail\n\n')
 
-# Bash commands to call the home-made script GO_annotate_suite_1.1.py that is appending to each peak all gene ontology terms with the same Entrez ID as the peak 
-go_pathway_annotation_script.write('GO_annotate_suite_1.1.py --thread {} --input_tsv {}/{}_all_peaks_calculated.tsv --output_tsv {}/{}_all_peaks_GO_annotated.tsv --go_folder {}/{}_gene_ontology \n\n'.format(
+# Bash commands to call the home-made script GO_annotator.py that is appending to each peak all gene ontology terms with the same Entrez ID as the peak 
+go_pathway_annotation_script.write('GO_annotator.py --thread {} --input_tsv {}/{}_all_peaks_calculated.tsv --output_tsv {}/{}_all_peaks_GO_annotated.tsv --go_folder {}/{}_gene_ontology\n\n'.format(
     cpu_count, 
     peaks_processing_dir, 
     dataset_name, 
@@ -3189,9 +3569,9 @@ go_pathway_annotation_script.write('GO_annotate_suite_1.1.py --thread {} --input
     peaks_processing_dir, 
     dataset_name))
 
-# Bash commands to call the home-made script pathway_annotate_suite_1.1.py that is appending to each peak 
+# Bash commands to call the home-made script pathway_annotator.py that is appending to each peak 
 #   all pathways, occurences, and interactions with the same Entrez ID as the peak 
-go_pathway_annotation_script.write('pathway_annotate_suite_1.1.py --thread {} --input_tsv {}/{}_all_peaks_GO_annotated.tsv --output_tsv {}/{}_all_peaks_GO_pathway_annotated.tsv --go_folder {}/{}_gene_ontology \n\n'.format(
+go_pathway_annotation_script.write('pathway_annotator.py --thread {} --input_tsv {}/{}_all_peaks_GO_annotated.tsv --output_tsv {}/{}_all_peaks_GO_pathway_annotated.tsv --go_folder {}/{}_gene_ontology\n\n'.format(
     cpu_count, 
     supplementary_annotations_dir, 
     dataset_name, 
@@ -3201,6 +3581,198 @@ go_pathway_annotation_script.write('pathway_annotate_suite_1.1.py --thread {} --
     dataset_name))
 
 go_pathway_annotation_script.close() # Closing the script '23_go_pathway_annotation_script.sh'. Flushing the write buffer
+
+
+
+####################################################################################################################
+### 24_homer_motif_enrichment_script.sh
+####################################################################################################################
+
+# Create all the following scripts and parent folders only when processing datasets with narrow peaks. None below exists in datasets with broad peaks.
+if peak_type == 'narrow':
+
+    # Create a directory "24_homer_motif_enrichment" for motif enrichment analysis results of the selected peak set by HOMER
+    homer_motif_enrichment_dir = '{}/24_homer_motif_enrichment'.format(output_dir)
+    if not os.path.exists(homer_motif_enrichment_dir + '/logs'):
+        os.makedirs(homer_motif_enrichment_dir + '/logs')
+
+    # Create a script "24_homer_motif_enrichment_script.sh" within, that reads and filters the processed peak list,
+    #   selecting the consensus, union, or both peak sets, and save them in this folder as inputs for HOMER findMotifsGenome.pl
+    # This script also calls for motif enrichment analysis program: HOMER findMotifsGenome.pl
+    #   that performs motif enrichment analysis to find the most potential protein-DNA binding motifs based on:
+    #       Consensus peak set if "consensus" is given as an argument for --homer_motif flag in ChIP-AP command line
+    #       Union peak set if "union" is given as an argument for --homer_motif_flag in ChIP-AP command line
+    #       Both consensus and union peak set if "both" is given as an argument for --homer_motif_flag in ChIP-AP command line
+    # In: setname_all_peaks_calculated.tsv (input from 22_peaks_processing_script.sh)
+    # Out: homerResults.html and knownResults.html (all the individual enriched motifs can be accessed through these .html files)
+
+    homer_motif_enrichment_consensus_script_name = '{}/24_homer_motif_enrichment_consensus_script.sh'.format(homer_motif_enrichment_dir)
+    homer_motif_enrichment_consensus_script = open(homer_motif_enrichment_consensus_script_name, 'w')
+    homer_motif_enrichment_consensus_script.write('#!/bin/bash\n\n')
+    homer_motif_enrichment_consensus_script.write('set -euxo pipefail\n\n')
+
+    homer_motif_enrichment_consensus_dir = '{}/24_homer_motif_enrichment/consensus_peak_set'.format(output_dir)
+    homer_motif_enrichment_consensus_script.write('mkdir -p {}\n\n'.format(homer_motif_enrichment_consensus_dir))
+
+    # Bash commands to reformat Genrich peak list file (.narrowPeak) into HOMER custom_setting_table format
+    homer_motif_enrichment_consensus_script.write('cat {}/{}_all_peaks_calculated.tsv'.format(peaks_processing_dir, dataset_name))
+    homer_motif_enrichment_consensus_script.write(r""" | awk 'NR == 1 ; $7 == 4'""") # Get only the consensus peaks (peaks with peak caller overlaps ($7) = 4) 
+    homer_motif_enrichment_consensus_script.write(r""" | awk 'BEGIN{FS = "\t"}{OFS="\t";print $1,$2,$3,$4,$5}'""") # Get only the unique peak ID ($1), chr ($2), start ($3), end ($4), and strand columns ($5) 
+    homer_motif_enrichment_consensus_script.write(' > {}/consensus_peaks.tsv\n\n'.format(homer_motif_enrichment_consensus_dir)) # Save it, as an input peak list for HOMER findMotifsGenome.pl
+
+    # Bash commands to call HOMER findMotifsGenome.pl to perform motif enrichment analysis based on ChIP-AP consensus peak set. One command, one run for every one replicate.
+    homer_motif_enrichment_consensus_script.write('findMotifsGenome.pl {}/consensus_peaks.tsv {} {} -p {} {} -dumpFasta 1> {}/logs/{}.HOMERmotifenrichment_consensus.out 2> {}/logs/{}.HOMERmotifenrichment_consensus.err\n\n'.format(
+        homer_motif_enrichment_consensus_dir,
+        genome_ref, 
+        homer_motif_enrichment_consensus_dir, 
+        cpu_count,
+        homer_findMotifsGenome_arg,
+        homer_motif_enrichment_dir,
+        dataset_name,
+        homer_motif_enrichment_dir,
+        dataset_name))
+
+    homer_motif_enrichment_consensus_script.close() # Closing the script 'homer_motif_enrichment_consensus_script.sh'. Flushing the write buffer
+
+
+
+    homer_motif_enrichment_union_script_name = '{}/24_homer_motif_enrichment_union_script.sh'.format(homer_motif_enrichment_dir)
+    homer_motif_enrichment_union_script = open(homer_motif_enrichment_union_script_name, 'w')
+    homer_motif_enrichment_union_script.write('#!/bin/bash\n\n')
+    homer_motif_enrichment_union_script.write('set -euxo pipefail\n\n')
+
+    homer_motif_enrichment_union_dir = '{}/24_homer_motif_enrichment/union_peak_set'.format(output_dir)
+    homer_motif_enrichment_union_script.write('mkdir -p {}\n\n'.format(homer_motif_enrichment_union_dir))
+
+    # Bash commands to reformat Genrich peak list file (.narrowPeak) into HOMER custom_setting_table format
+    homer_motif_enrichment_union_script.write('cat {}/{}_all_peaks_calculated.tsv'.format(peaks_processing_dir, dataset_name))
+    homer_motif_enrichment_union_script.write(r""" | awk 'BEGIN{FS = "\t"}{OFS="\t";print $1,$2,$3,$4,$5}'""") # Get only the unique peak ID ($1), chr ($2), start ($3), end ($4), and strand columns ($5) 
+    homer_motif_enrichment_union_script.write(' > {}/union_peaks.tsv\n\n'.format(homer_motif_enrichment_union_dir)) # Save it, as an input peak list for HOMER findMotifsGenome.pl
+
+    # Bash commands to call HOMER findMotifsGenome.pl to perform motif enrichment analysis based on ChIP-AP union peak set. One command, one run for every one replicate.
+    homer_motif_enrichment_union_script.write('findMotifsGenome.pl {}/union_peaks.tsv {} {} -p {} {} -dumpFasta 1> {}/logs/{}.HOMERmotifenrichment_union.out 2> {}/logs/{}.HOMERmotifenrichment_union.err\n\n'.format(
+        homer_motif_enrichment_union_dir,
+        genome_ref, 
+        homer_motif_enrichment_union_dir, 
+        cpu_count,
+        homer_findMotifsGenome_arg,
+        homer_motif_enrichment_dir,
+        dataset_name,
+        homer_motif_enrichment_dir,
+        dataset_name))
+
+    homer_motif_enrichment_union_script.close() # Closing the script 'homer_motif_enrichment_union_script.sh'. Flushing the write buffer
+
+
+
+####################################################################################################################
+### 25_meme_motif_enrichment_script.sh
+####################################################################################################################
+
+# Create all the following scripts and parent folders only when processing datasets with narrow peaks. None below exists in datasets with broad peaks.
+if peak_type == 'narrow':
+
+    # Create a directory "25_meme_motif_enrichment" for motif enrichment analysis results of the selected peak set by MEME
+    meme_motif_enrichment_dir = '{}/25_meme_motif_enrichment'.format(output_dir)
+    if not os.path.exists(meme_motif_enrichment_dir + '/logs'):
+        os.makedirs(meme_motif_enrichment_dir + '/logs')
+
+    # Create a script "24_homer_motif_enrichment_script.sh" within, that reads and filters the processed peak list,
+    #   selecting the consensus, union, or both peak sets, and save them in this folder as inputs for HOMER findMotifsGenome.pl
+    # This script also calls for motif enrichment analysis program: HOMER findMotifsGenome.pl
+    #   that performs motif enrichment analysis to find the most potential protein-DNA binding motifs based on:
+
+    # Create a script "25_meme_motif_enrichment_script.sh" within, that generates target and background sequences
+    #   based on the peak coordinates in the processed peak list, and save them in this folder as inputs for meme-chip
+    # This script also calls for motif enrichment analysis program: meme-chip
+    #   that performs motif enrichment analysis to find the most potential protein-DNA binding motifs based on:
+    #       Consensus peak set if "consensus" is given as an argument for --meme_motif flag in ChIP-AP command line
+    #       Union peak set if "union" is given as an argument for --meme_motif_flag in ChIP-AP command line
+    #       Both consensus and union peak set if "both" is given as an argument for --meme_motif_flag in ChIP-AP command line
+    # In: setname_all_peaks_calculated.tsv (input from 22_peaks_processing_script.sh)
+    # Out: meme-chip.html (all the enriched motifs and modular analysis results can be accessed through this .html file)
+
+
+    # Put _rep[#] behind the file or folder name when there are going to be multi-replicated results from multi-replicated meme-chip runs
+    if len(chip_name) == 1:
+        fasta_suffix_list = ['']
+    elif len(chip_name) > 1:
+        if force_merge == 1:
+            fasta_suffix_list = ['']
+        elif force_merge == 0:
+            fasta_suffix_list = ['_rep{}'.format(list_counter + 1) for list_counter in range(len(chip_name))]
+
+    meme_motif_enrichment_consensus_script_name = '{}/25_meme_motif_enrichment_consensus_script.sh'.format(meme_motif_enrichment_dir)
+    meme_motif_enrichment_consensus_script = open(meme_motif_enrichment_consensus_script_name, 'w')
+    meme_motif_enrichment_consensus_script.write('#!/bin/bash\n\n')
+    meme_motif_enrichment_consensus_script.write('set -euxo pipefail\n\n')
+
+    meme_motif_enrichment_consensus_dir = '{}/25_meme_motif_enrichment/consensus_peak_set'.format(output_dir)
+    meme_motif_enrichment_consensus_script.write('mkdir -p {}\n\n'.format(meme_motif_enrichment_consensus_dir))
+
+    meme_motif_enrichment_consensus_script.write('meme_sequence_extractor.py --input {}/{}_all_peaks_calculated.tsv --fastadir {}/bwa --chrsizedir {}/chrom.sizes --outputdir {} --ref {} --background --filter 4\n\n'.format(peaks_processing_dir,
+                                    dataset_name,
+                                    genome_dir,
+                                    genome_dir,
+                                    meme_motif_enrichment_consensus_dir,
+                                    genome_ref))
+
+    # Bash commands to call meme-chip to perform motif enrichment analysis based on ChIP-AP consensus peak set. One command, one run for every one replicate.
+    for list_counter in range(len(fasta_suffix_list)):
+        meme_motif_enrichment_consensus_script.write('meme-chip -oc {}/motif_analysis{} -neg {}/background{}.fa {} -meme-p {} {}/target{}.fa 1> {}/logs/{}.MEMEmotifenrichment_consensus{}.out 2> {}/logs/{}.MEMEmotifenrichment_consensus{}.err\n\n'.format(
+            meme_motif_enrichment_consensus_dir,
+            fasta_suffix_list[list_counter],
+            meme_motif_enrichment_consensus_dir,
+            fasta_suffix_list[list_counter],
+            meme_chip_arg,
+            cpu_count, 
+            meme_motif_enrichment_consensus_dir,
+            fasta_suffix_list[list_counter],
+            meme_motif_enrichment_dir,
+            dataset_name,
+            fasta_suffix_list[list_counter],
+            meme_motif_enrichment_dir,
+            dataset_name,
+            fasta_suffix_list[list_counter]))
+
+    meme_motif_enrichment_consensus_script.close() # Closing the script 'meme_motif_enrichment_consensus_script.sh'. Flushing the write buffer
+
+
+
+    meme_motif_enrichment_union_script_name = '{}/25_meme_motif_enrichment_union_script.sh'.format(meme_motif_enrichment_dir)
+    meme_motif_enrichment_union_script = open(meme_motif_enrichment_union_script_name, 'w')
+    meme_motif_enrichment_union_script.write('#!/bin/bash\n\n')
+    meme_motif_enrichment_union_script.write('set -euxo pipefail\n\n')
+
+    meme_motif_enrichment_union_dir = '{}/25_meme_motif_enrichment/union_peak_set'.format(output_dir)
+    meme_motif_enrichment_union_script.write('mkdir -p {}\n\n'.format(meme_motif_enrichment_union_dir))
+
+    meme_motif_enrichment_union_script.write('meme_sequence_extractor.py --input {}/{}_all_peaks_calculated.tsv --fastadir {}/bwa --chrsizedir {}/chrom.sizes --outputdir {} --ref {} --background --filter 1\n\n'.format(peaks_processing_dir,
+                                    dataset_name,
+                                    genome_dir,
+                                    genome_dir,
+                                    meme_motif_enrichment_union_dir,
+                                    genome_ref))
+
+    # Bash commands to call meme-chip to perform motif enrichment analysis based on ChIP-AP union peak set. One command, one run for every one replicate.
+    for list_counter in range(len(fasta_suffix_list)):
+        meme_motif_enrichment_union_script.write('meme-chip -oc {}/motif_analysis{} -neg {}/background{}.fa {} -meme-p {} {}/target{}.fa 1> {}/logs/{}.MEMEmotifenrichment_union{}.out 2> {}/logs/{}.MEMEmotifenrichment_union{}.err\n\n'.format(
+            meme_motif_enrichment_union_dir,
+            fasta_suffix_list[list_counter],
+            meme_motif_enrichment_union_dir,
+            fasta_suffix_list[list_counter],
+            meme_chip_arg,
+            cpu_count, 
+            meme_motif_enrichment_union_dir,
+            fasta_suffix_list[list_counter],
+            meme_motif_enrichment_dir,
+            dataset_name,
+            fasta_suffix_list[list_counter],
+            meme_motif_enrichment_dir,
+            dataset_name,
+            fasta_suffix_list[list_counter]))
+
+    meme_motif_enrichment_union_script.close() # Closing the script 'meme_motif_enrichment_union_script.sh'. Flushing the write buffer
 
 
 
@@ -3291,6 +3863,38 @@ if args.goann and args.pathann:
     master_script.write('echo Annotating every individual peak with all relevant GO terms, pathways, cooccurences, and interactions from HOMER annotatePeaks -go feature\n')
     master_script.write('{}\n\n'.format(go_pathway_annotation_script_name))
 
+if args.homer_motif and peak_type == 'narrow': # Motif enrichment analyses are only performed on datasets with narrow peaks
+    if args.homer_motif == 'consensus': # If user wants analysis on the consensus peak set (4 peak callers overlap)
+        master_script.write('echo Performing motif enrichment analysis on the consensus peak set with HOMER findMotifsGenome.pl\n')
+        master_script.write('{}\n\n'.format(homer_motif_enrichment_consensus_script_name))
+    
+    if args.homer_motif == 'union': # If user wants analysis on the union peak set (everything)
+        master_script.write('echo Performing motif enrichment analysis on the union peak set with HOMER findMotifsGenome.pl\n')
+        master_script.write('{}\n\n'.format(homer_motif_enrichment_union_script_name))
+
+    if args.homer_motif == 'both': # If user wants analysis on both peak sets
+        master_script.write('echo Performing motif enrichment analysis on the consensus peak set with HOMER findMotifsGenome.pl\n')
+        master_script.write('{}\n\n'.format(homer_motif_enrichment_consensus_script_name))
+
+        master_script.write('echo Performing motif enrichment analysis on the union peak set with HOMER findMotifsGenome.pl\n')
+        master_script.write('{}\n\n'.format(homer_motif_enrichment_union_script_name))
+
+if args.meme_motif and peak_type == 'narrow': # Motif enrichment analyses are only performed on datasets with narrow peaks
+    if args.meme_motif == 'consensus': # If user wants analysis on the consensus peak set (4 peak callers overlap)
+        master_script.write('echo Performing motif enrichment analysis on the consensus peak set with meme-chip\n')
+        master_script.write('{}\n\n'.format(meme_motif_enrichment_consensus_script_name))
+    
+    if args.meme_motif == 'union': # If user wants analysis on the union peak set (everything)
+        master_script.write('echo Performing motif enrichment analysis on the union peak set with meme-chip\n')
+        master_script.write('{}\n\n'.format(meme_motif_enrichment_union_script_name))
+
+    if args.meme_motif == 'both': # If user wants analysis on both peak sets
+        master_script.write('echo Performing motif enrichment analysis on the consensus peak set with meme-chip\n')
+        master_script.write('{}\n\n'.format(meme_motif_enrichment_consensus_script_name))
+
+        master_script.write('echo Performing motif enrichment analysis on the union peak set with meme-chip\n')
+        master_script.write('{}\n\n'.format(meme_motif_enrichment_union_script_name))
+
 master_script.close() # Closing the script 'MASTER_script.sh'. Flushing the write buffer
 
 
@@ -3328,6 +3932,15 @@ subprocess.run('chmod +x ' + peaks_processing_script_name, shell = True)
 subprocess.run('chmod +x ' + go_annotation_script_name, shell = True)
 subprocess.run('chmod +x ' + pathway_annotation_script_name, shell = True)
 subprocess.run('chmod +x ' + go_pathway_annotation_script_name, shell = True)
+
+# Only mark all motif enrichment analysis scripts in datasets with narrow peaks
+# Motif enrichment analysis scripts and their parent folders are not generated in datasets with broad peaks
+if peak_type == 'narrow':
+    subprocess.run('chmod +x ' + homer_motif_enrichment_consensus_script_name, shell = True)
+    subprocess.run('chmod +x ' + homer_motif_enrichment_union_script_name, shell = True)
+    subprocess.run('chmod +x ' + meme_motif_enrichment_consensus_script_name, shell = True)
+    subprocess.run('chmod +x ' + meme_motif_enrichment_union_script_name, shell = True)
+
 subprocess.run('chmod +x ' + master_script_name, shell = True)
 
 
@@ -3340,14 +3953,6 @@ subprocess.run('chmod +x ' + master_script_name, shell = True)
 if args.run:
     subprocess.run(master_script_name, shell = True)
 elif not args.run:
-    print('NOTICE ::: The suite now can be started manually by running MASTER_script.sh in {} ::: NOTICE'.format(output_dir))
+    print('\nNOTICE ::: The suite now can be started manually by running MASTER_script.sh in {} ::: NOTICE\n'.format(output_dir))
 
 
-
-####################################################################################################################
-### PLEASE IGNORE BELOW ###
-####################################################################################################################
-
-# Ideas for further implementation.
-
-# ChIP_RIP_connect_multi_pool.py all_peaks_calculated.tsv rip_peak_list ChIP_RIP_candidates_linked.tsv

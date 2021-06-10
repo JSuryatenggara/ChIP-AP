@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+#pyright: reportUnboundVariable=false
+
+
+# script_version = '1.0'
+
 
 print('Running statistics analysis on each peak caller combination')
 

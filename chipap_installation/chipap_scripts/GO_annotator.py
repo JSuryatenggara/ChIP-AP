@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
+#pyright: reportUnboundVariable=false
 
+
+# script_version = '1.1'
 
 
 # PATCH NOTES
@@ -12,7 +15,6 @@
 print('Running GO annotation script')
 
 print('Importing required modules')
-import sys
 import csv
 import os
 import multiprocessing
