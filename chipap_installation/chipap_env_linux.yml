@@ -141,5 +141,9 @@ dependencies:
   - zlib=1.2.11=h7b6447c_3
   - zstd=1.4.5=h9ceee32_0
   - pip:
+    - chardet==4.0.0
+    - idna==2.10
     - pandas==1.2.1
     - pytz==2021.1
+    - requests==2.25.1
+    - urllib3==1.26.5
