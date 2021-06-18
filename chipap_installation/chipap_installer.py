@@ -14,7 +14,6 @@ def replace_path(input_file, old_string, new_string):
     new_file = ""
 
     for line in old_file.readlines():
-        # stripped_line = line.strip()
         if old_string in line:
             new_line = new_string + "\n"
         else:
