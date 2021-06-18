@@ -67,7 +67,11 @@ elif sys.platform == "darwin":
     subprocess.run('pip install pandas', shell = True)
 
 
-subprocess.run('conda env create -f {}/chipap_{}.yml'.format(sys.path[0], user_environment), shell = True)
+if user_answer.lower() == 'y':
+    subprocess.run('conda env create -f {}/chipap_{}.yml'.format(sys.path[0], user_environment), shell = True)
+
+if user_answer.lower() == 'n':
+    subprocess.run('conda env update -f {}/chipap_{}.yml'.format(sys.path[0], user_environment), shell = True)
 
 subprocess.run('chmod +x {}/chipap_scripts/*'.format(sys.path[0]), shell = True)
 
