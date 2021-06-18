@@ -47,13 +47,15 @@ while True:
         user_environment = input('Please type in the name of your ChIP-AP environment: ')
         chipap_env_dir = '{}/envs/{}'.format(conda_dir, user_environment)
         prefix_string = 'prefix: {}'.format(chipap_env_dir)
+        name_string = 'name: {}'.format(user_environment)
         input('ChIP-AP will be installed in {} environment. Press ENTER to continue'.format(user_environment))
         break
 
     if user_answer.lower() == 'n':
+        user_environment = 'base'
         chipap_env_dir = '{}'.format(conda_dir)
         prefix_string = 'prefix: {}'.format(chipap_env_dir)
-        user_environment = 'base'
+        name_string = 'name: {}'.format(user_environment)
         input('ChIP-AP will be installed in base environment. Press ENTER to continue')
         break
 
@@ -63,17 +65,17 @@ while True:
 
 if sys.platform == "linux" or sys.platform == "linux2":
     shutil.copy('{}/chipap_env_linux.yml'.format(sys.path[0]), '{}/chipap_{}.yml'.format(sys.path[0], user_environment))
-    prefixed_yml = open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'a')
-    prefixed_yml.write('\n{}'.format(prefix_string))
-    prefixed_yml.close()
+    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'r') as original_yml: yml_contents = original_yml.read()
+    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'w') as named_yml: named_yml.write('{}\n'.format(name_string) + yml_contents + '\n{}'.format(prefix_string))
+    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'a') as prefixed_yml: prefixed_yml.write('\n{}'.format(prefix_string))
 
 elif sys.platform == "darwin":
     subprocess.run('/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"', shell = True)
     subprocess.run('brew install wget', shell = True)
     shutil.copy('{}/chipap_env_macos.yml'.format(sys.path[0]), '{}/chipap_{}.yml'.format(sys.path[0], user_environment))
-    prefixed_yml = open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'a')
-    prefixed_yml.write('\n{}'.format(prefix_string))
-    prefixed_yml.close()
+    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'r') as original_yml: yml_contents = original_yml.read()
+    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'w') as named_yml: named_yml.write('{}\n'.format(name_string) + yml_contents + '\n{}'.format(prefix_string))
+    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'a') as prefixed_yml: prefixed_yml.write('\n{}'.format(prefix_string))
     subprocess.run('pip install pandas', shell = True)
 
 
