@@ -1,4 +1,3 @@
-name: python3_chipap
 channels:
   - hcc
   - bioconda
