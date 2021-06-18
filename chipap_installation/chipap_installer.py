@@ -6,14 +6,6 @@ import subprocess
 import sys
 import os
 import time
-# try:
-#     import pandas as pd
-# except ImportError:
-#     print("Dependency missing, downloading and installing now")
-#     import pip
-#     pip.main(['install', '--user', 'pandas'])
-#     time.sleep(5) # Sleep for 3 seconds
-
 import pandas as pd
 
 def replace_path(input_file, old_string, new_string):
@@ -34,7 +26,6 @@ def replace_path(input_file, old_string, new_string):
     writing_file = open(input_file, "w")
     writing_file.write(new_file)
     writing_file.close()
-
 
 
 conda_file = shutil.which('conda')
@@ -66,16 +57,14 @@ while True:
 if sys.platform == "linux" or sys.platform == "linux2":
     shutil.copy('{}/chipap_env_linux.yml'.format(sys.path[0]), '{}/chipap_{}.yml'.format(sys.path[0], user_environment))
     with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'r') as original_yml: yml_contents = original_yml.read()
-    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'w') as named_yml: named_yml.write('{}\n'.format(name_string) + yml_contents + '\n{}'.format(prefix_string))
-    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'a') as prefixed_yml: prefixed_yml.write('\n{}'.format(prefix_string))
+    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'w') as modified_yml: modified_yml.write('{}\n'.format(name_string) + yml_contents + '{}'.format(prefix_string))
 
 elif sys.platform == "darwin":
     subprocess.run('/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"', shell = True)
     subprocess.run('brew install wget', shell = True)
     shutil.copy('{}/chipap_env_macos.yml'.format(sys.path[0]), '{}/chipap_{}.yml'.format(sys.path[0], user_environment))
     with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'r') as original_yml: yml_contents = original_yml.read()
-    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'w') as named_yml: named_yml.write('{}\n'.format(name_string) + yml_contents + '\n{}'.format(prefix_string))
-    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'a') as prefixed_yml: prefixed_yml.write('\n{}'.format(prefix_string))
+    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'w') as modified_yml: modified_yml.write('{}\n'.format(name_string) + yml_contents + '{}'.format(prefix_string))
     subprocess.run('pip install pandas', shell = True)
 
 
@@ -93,7 +82,6 @@ wizard_full_path = '{}/chipap_scripts/chipap_wizard.py'.format(sys.path[0])
 
 replace_path(dashboard_full_path, 'genome_folder_full_path =', genome_folder_full_path)
 replace_path(wizard_full_path, 'genome_folder_full_path =', genome_folder_full_path)
-
 
 
 homer_genome_update_script_full_path = '{}/homer_genome_update.sh'.format(sys.path[0])
