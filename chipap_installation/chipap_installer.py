@@ -55,17 +55,28 @@ while True:
 
 if sys.platform == "linux" or sys.platform == "linux2":
     shutil.copy('{}/chipap_env_linux.yml'.format(sys.path[0]), '{}/chipap_{}.yml'.format(sys.path[0], user_environment))
-    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'r') as original_yml: yml_contents = original_yml.read()
-    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'w') as modified_yml: modified_yml.write('{}\n'.format(name_string) + yml_contents + '{}'.format(prefix_string))
+    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'r') as original_yml: yml_contents = original_yml.readlines()
+
+    new_yml_contents = []    
+    for yml_contents_row in yml_contents:
+        if 'name: ' not in yml_contents_row and 'prefix: ' not in yml_contents_row:
+            new_yml_contents.append(yml_contents_row)
+
+    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'w') as modified_yml: modified_yml.write('{}\n'.format(name_string) + ''.join(new_yml_contents) + '{}\n'.format(prefix_string))
 
 elif sys.platform == "darwin":
     subprocess.run('/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"', shell = True)
     subprocess.run('brew install wget', shell = True)
     shutil.copy('{}/chipap_env_macos.yml'.format(sys.path[0]), '{}/chipap_{}.yml'.format(sys.path[0], user_environment))
-    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'r') as original_yml: yml_contents = original_yml.read()
-    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'w') as modified_yml: modified_yml.write('{}\n'.format(name_string) + yml_contents + '{}'.format(prefix_string))
-    subprocess.run('pip install pandas', shell = True)
+    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'r') as original_yml: yml_contents = original_yml.readlines()
 
+    new_yml_contents = []    
+    for yml_contents_row in yml_contents:
+        if 'name: ' not in yml_contents_row and 'prefix: ' not in yml_contents_row:
+            new_yml_contents.append(yml_contents_row)
+
+    with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'w') as modified_yml: modified_yml.write('{}\n'.format(name_string) + ''.join(new_yml_contents) + '{}\n'.format(prefix_string))
+    subprocess.run('pip install pandas', shell = True)
 
 if user_answer.lower() == 'y':
     subprocess.run('conda env create -f {}/chipap_{}.yml'.format(sys.path[0], user_environment), shell = True)
@@ -110,12 +121,15 @@ path_to_chipap_scripts = 'PATH=$PATH:{}/chipap_scripts'.format(sys.path[0])
 
 if sys.platform == "linux" or sys.platform == "linux2":
     # linux
+    path_exist = 0
     with open(os.path.expanduser('~/.bashrc'), "r+") as file:
         for line in file:
             if '{}\n'.format(path_to_chipap_scripts) == line:
+               path_exist = 1
                break
-            else: # not found, we are at the eof
-                file.write('{}\n'.format(path_to_chipap_scripts)) # append the new path to chipap_scripts
+        # not found, we are at the eof
+        if path_exist == 0:
+            file.write('{}\n'.format(path_to_chipap_scripts)) # append the new path to chipap_scripts
     subprocess.run('exec bash', shell = True) # reload bashrc
 
 elif sys.platform == "darwin":
@@ -126,13 +140,16 @@ elif sys.platform == "darwin":
 
     if os.path.isfile('~/.bash_profile'):
         print (".bash_profile exist")
+        path_exist = 0
         with open(os.path.expanduser('~/.bash_profile'), "r+") as file:
             for line in file:
                 if '{}\n'.format(path_to_chipap_scripts) == line:
+                    path_exist = 1
                     break
-                else: # not found, we are at the eof
-                    cwd = os.getcwd()
-                    file.write('export PATH="{}/chipap_scripts:$PATH"'.format(cwd))
+            # not found, we are at the eof
+            if path_exist == 0:            
+                cwd = os.getcwd()
+                file.write('export PATH="{}/chipap_scripts:$PATH"'.format(cwd))
     else:
         print (".bash_profile doesnt exist, making it")
         with open(os.path.expanduser('~/.bash_profile'), "w+") as file:
