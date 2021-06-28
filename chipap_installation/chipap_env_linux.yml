@@ -1,9 +1,10 @@
-name: python3_chipap
+name: (Ignore this line. Will be replaced.)
 channels:
-  - conda-forge
-  - hcc
-  - bioconda
+  - default
   - defaults
+  - bioconda
+  - hcc
+  - conda-forge
 dependencies:
   - _libgcc_mutex=0.1=main
   - _r-mutex=1.0.0=anacondar_1
@@ -58,7 +59,7 @@ dependencies:
   - lz4-c=1.9.3=h2531618_0
   - macs2=2.2.6=py37h516909a_0
   - matplotlib-base=3.3.4=py37h62a2d02_0
-  - meme=5.3.0=py37pl5262h2b62359_2
+  - meme=5.0.5=py37pl526h19b89cf_0
   - mkl=2020.2=256
   - mkl-service=2.3.0=py37he8ac12f_0
   - mkl_fft=1.2.1=py37h54f3939_0
@@ -105,3 +106,4 @@ dependencies:
   - pip:
     - pandas==1.2.1
     - pytz==2021.1
+prefix: (Ignore this line. Will be replaced.)
