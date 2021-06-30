@@ -657,7 +657,7 @@ The table below shows the contents of [setname]_all_peaks_go_pathway_annotated.t
 
 All the results are compiled and can be viewed by opening the file homerResults.html in an HTML file viewer such as your internet browser. This file gives you a formatted, organized view of the enriched de novo motifs and all the relevant information, as can be seen below. Additionally, more details can be accessed by simply clicking on the links in the table.
 
-<img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/HOMER_motif_results.png>
+<img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/HOMER_motif_results.PNG>
 
 We can see these information listed below from the table:
 
@@ -684,7 +684,7 @@ All the results are compiled and can be viewed by opening the file meme-chip.htm
 
 In datasets where there is an equal number of multiple-replicated ChIP and control samples, ChIP-AP will have MEME perform a pair-wise motif enrichment analysis. Therefore, in that case, there will be multiple replicates of motif enrichment results, each one looking like below.
 
-<img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/MEME_motif_results.png>
+<img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/MEME_motif_results.PNG>
 
 While the file above gives a more graphical representation of the results, meme-chip also generates another file: summary.tsv, which contains the same information (see below) repackaged in table format suitable for subsequent processing, if needed.
 
