@@ -103,7 +103,7 @@ Before attempting to install ChIP-AP on your local machine, make sure your hardw
 
 3. After downloading ChIP-AP, move the downloaded ChIP-AP package archive to a directory of your choosing and unzip the content there. This will be the installation directory for ChIP-AP
 
-4. To install, run: chipap_install.py from the command line inside the unpacked folder
+4. To install, run: chipap_installer.py from the command line inside the unpacked folder
 
 <br>
 
@@ -396,7 +396,7 @@ For average fold enrichment calculation in cases of broad peak type datasets, sa
 In addition, the custom-made script also makes some reformatting and provides additional information necessary for downstream analysis.
 
     Modular script used: 22_peaks_processing_script.sh
-    Calls	: fold_change_calculator_suite_xx.py
+    Calls	: fold_change_calculator.py
     Input	: 22_peaks_processing / [setname]_all_peaks_annotated.tsv
     Process	: Calculate ChIP tag counts (read depth)
 	          Calculate weighted center fold change (narrow peak only)
@@ -410,7 +410,7 @@ In addition, the custom-made script also makes some reformatting and provides ad
 Performed by a custom script designed for quality assessment of called peaks. Returns a summary text file containing information pertaining to the peak read depth, peak fold enrichment, known motif hits, and positive peak hits (based on known motif presence), in each peak set along the continuum between single peak callers and the absolute consensus of all four peak callers.
 
     Modular script used: 22_peaks_processing_script.sh
-    Calls	: peak_caller_stats_suite.py
+    Calls	: peak_caller_stats_calculator.py
     Input	: 22_peaks_processing / [setname]_all_peaks_calculated.tsv
     Process	: Generate a separate summary table of key statistics in peak callers performance 
     Output	: 22_peaks_processing / [setname]_peak_caller_combinations_statistics.tsv
@@ -419,7 +419,7 @@ Performed by a custom script designed for quality assessment of called peaks. Re
 Each peak in the concatenated list is appended with all the gene ontology terms associated with its gene annotation. The gene ontology terms are derived from biological processes, molecular functions, and cellular compartments databases. This enables list filtering based on the gene ontology terms of the study’s interest
 
     Modular script used: 23_go_annotation_script.sh
-    Calls	: go_annotate_suite_xx.py
+    Calls	: go_annotator.py
     Input	: 22_peaks_processing / [setname]_all_peaks_calculated.tsv
     Process	: Append related gene ontology terms to the list of peaks
     Output	: 23_supplementary_annotations / [setname]_all_peaks_go_annotated.tsv
@@ -428,10 +428,32 @@ Each peak in the concatenated list is appended with all the gene ontology terms 
 Each peak in the concatenated list is appended with all the related biological pathways associated with its gene annotation. The biological pathway terms are derived from KEGG, SMPDB, Biocyc, Reactome, Wikipathways, and pathwayInteractionDB databases. This enables list filtering based on the biological pathways of the study’s interest. Additionally, this analysis also adds other terms pertaining to known interactions with common proteins and known gene mutations found in malignant cases, derived from common protein interaction and COSMIC databases, respectively.
 
     Modular script used: 23_pathway_annotation_script.sh
-    Calls	: pathway_annotate_suite_xx.py
+    Calls	: pathway_annotator.py
     Input	: 22_peaks_processing / [setname]_all_peaks_calculated.tsv
     Process	: Append known pathways and interactions to the list of peaks
     Output	: 23_supplementary_annotations / [setname]_all_peaks_pathway_annotated.tsv
+
+### 23. (Optional) Downstream analysis: Motif enrichment analysis with HOMER. 
+Genomic sequences are extracted based on the coordinates of the peaks in consensus (four peak callers overlap), union (all called peaks), or both peak lists. HOMER performs analysis to identify specific DNA sequence motifs to which the experimented protein(s) have binding affinity towards. For the sake of processing speed, HOMER utilizes cumulative binomial distribution to calculate motif enrichment by default. However, by utilizing ChIP-AP custom setting table, user may choose to utilize cumulative hypergeometric distribution, which describes motif enrichment problem more accurately. Besides the typically performed calculations for de novo motifs discovery, HOMER also calculates the enrichment scores of the known motifs in HOMER motifs database. Since the relevance of protein-DNA binding events are mainly more restricted to the context of transcription factors compared to its histone modifiers counterpart, this optional downstream analysis option is only available for datasets with narrow (transcription factor) peaks.
+
+    Modular script used: 24_homer_motif_enrichment_consensus_script.sh
+                         24_homer_motif_enrichment_union_script.sh
+    Calls   : findMotifsGenome.pl
+    Input   : 22_peaks_processing / [setname]_all_peaks_calculated.tsv
+    Process : Performs motif enrichment analysis
+    Output  : 24_homer_motif_enrichment / ... / homerResults.html
+              24_homer_motif_enrichment / ... / knownResults.html
+
+### 24. (Optional) Downstream analysis: Motif enrichment analysis with MEME. Genomic
+sequences are extracted based on the coordinates of the peaks in consensus (four peak callers overlap), union (all called peaks), or both peak lists. With or without control sequences extracted from random genomic sequences, MEME performs analysis to identify specific DNA sequence motifs to which the experimented protein(s) have binding affinity towards. By utilizing separate dedicated modules included in MEME suite, MEME-ChIP performs de novo motif discovery, motif enrichment analysis, motif location analysis and motif clustering in one go, providing a comprehensive picture of the DNA motifs that are enriched in the extracted sequences. MEME-ChIP performs two complementary types of de novo motif discovery: weight matrix–based discovery for high accuracy, and word-based discovery for high sensitivity. Since the relevance of protein-DNA binding events are mainly more restricted to the context of transcription factors compared to its histone
+modifiers counterpart, this optional downstream analysis option is only available for datasets with narrow (transcription factor) peaks.
+
+    Modular script used: 25_meme_motif_enrichment_consensus_script.sh
+                         25_meme_motif_enrichment_union_script.sh
+    Calls   : meme-chip
+    Input   : 22_peaks_processing / [setname]_all_peaks_calculated.tsv
+    Process : Performs motif enrichment analysis
+    Output  : 25_meme_motif_enrichment / ... / meme-chip.html
 
 <br>
 
@@ -481,9 +503,9 @@ The table below shows the contents of [setname]_all_peaks_go_pathway_annotated.t
         <tr>
             <td><nobr><b>Column 7 (G)</td>
             <td><nobr>Peak Caller Overlaps</td>
-            <td rowspan=5>
+            <td rowspan=6>
                 <b>Pipeline script:</b><br>22_peaks_processing_script.sh
-                <br><b>Called script:</b><br>fold_change_calculator_suite_xx.py
+                <br><b>Called script:</b><br>fold_change_calculator.py
                 <br><b>Output file:</b><br>[setname]_all_peaks_calculated.tsv
                 <br><b>Output folder:</b><br>22_peaks_processing
             </td>
@@ -500,12 +522,16 @@ The table below shows the contents of [setname]_all_peaks_go_pathway_annotated.t
             <td><nobr><b>Column 10 (J)</td>
             <td><nobr>Fold Change</td>
         </tr>
-        <tr>
+                <tr>
             <td><nobr><b>Column 11 (K)</td>
-            <td><nobr>Number of Motifs</td>
+            <td><nobr>Peak Center</td>
         </tr>
         <tr>
             <td><nobr><b>Column 12 (L)</td>
+            <td><nobr>Number of Motifs</td>
+        </tr>
+        <tr>
+            <td><nobr><b>Column 13 (M)</td>
             <td><nobr>Annotation</td>
             <td rowspan=14>
                 <b>Pipeline script:</b><br>22_peaks_processing_script.sh
@@ -515,111 +541,111 @@ The table below shows the contents of [setname]_all_peaks_go_pathway_annotated.t
             </td>
         </tr>
         <tr>
-            <td><nobr><b>Column 13 (M)</td>
+            <td><nobr><b>Column 14 (N)</td>
             <td><nobr>Detailed Annotation</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 14 (N)</td>
+            <td><nobr><b>Column 15 (O)</td>
             <td><nobr>Distance to TSS</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 15 (O)</td>
+            <td><nobr><b>Column 16 (P)</td>
             <td><nobr>Nearest PromoterID</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 16 (P)</td>
+            <td><nobr><b>Column 17 (Q)</td>
             <td><nobr>Entrez ID</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 17 (Q)</td>
+            <td><nobr><b>Column 18 (R)</td>
             <td><nobr>Nearest Unigene</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 18 (R)</td>
+            <td><nobr><b>Column 19 (S)</td>
             <td><nobr>Nearest Refseq</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 19 (S)</td>
+            <td><nobr><b>Column 20 (T)</td>
             <td><nobr>Nearest Ensembl</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 20 (T)</td>
+            <td><nobr><b>Column 21 (U)</td>
             <td><nobr>Gene Name</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 21 (U)</td>
+            <td><nobr><b>Column 22 (V)</td>
             <td><nobr>Gene Alias</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 22 (V)</td>
+            <td><nobr><b>Column 23 (W)</td>
             <td><nobr>Gene Description</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 23 (W)</td>
+            <td><nobr><b>Column 24 (X)</td>
             <td><nobr>Gene Type</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 24 (X)</td>
+            <td><nobr><b>Column 25 (Y)</td>
             <td><nobr>CpG%</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 25 (Y)</td>
+            <td><nobr><b>Column 26 (Z)</td>
             <td><nobr>GC%</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 26 (Z)</td>
+            <td><nobr><b>Column 27 (AA)</td>
             <td><nobr>Biological Process</td>
             <td rowspan=3>
                 <b>Pipeline script:</b><br>23_go_annotation_script.sh
-                <br><b>Called script:</b><br>GO_annotate_suite_xx.py
+                <br><b>Called script:</b><br>GO_annotator.py
                 <br><b>Output file:</b><br>[setname]_all_peaks_go_annotated.tsv
                 <br><b>Output folder:</b><br>23_supplementary_annotations
             </td>
         </tr>
         <tr>
-            <td><nobr><b>Column 27 (AA)</td>
+            <td><nobr><b>Column 28 (AB)</td>
             <td><nobr>Molecular Function</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 28 (AB)</td>
+            <td><nobr><b>Column 29 (AC)</td>
             <td><nobr>Cellular Component</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 29 (AC)</td>
+            <td><nobr><b>Column 30 (AD)</td>
             <td><nobr>Interaction with Common Protein</td>
             <td rowspan=8>
                 <b>Pipeline script:</b><br>23_pathway_annotation_script.sh
-                <br><b>Called script:</b><br>pathway_annotate_suite_xx.py
+                <br><b>Called script:</b><br>pathway_annotator.py
                 <br><b>Output file:</b><br>[setname]_all_peaks_pathway_annotated.tsv
                 <br><b>Output folder:</b><br>23_supplementary_annotations
             </td>
         </tr>
         <tr>
-            <td><nobr><b>Column 30 (AD)</td>
+            <td><nobr><b>Column 31 (AE)</td>
             <td><nobr>Somatic Mutations (COSMIC)</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 31 (AE)</td>
+            <td><nobr><b>Column 32 (AF)</td>
             <td><nobr>Pathway (KEGG)</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 32 (AF)</td>
+            <td><nobr><b>Column 33 (AG)</td>
             <td><nobr>Pathway (BIOCYC)</td>
         </tr>
         <tr>
-           <td><nobr><b>Column 33 (AG)</td>
+           <td><nobr><b>Column 34 (AH)</td>
             <td><nobr>Pathway (pathwayInteractionDB)</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 34 (AH)</td>
+            <td><nobr><b>Column 35 (AI)</td>
             <td><nobr>Pathway (REACTOME)</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 35 (AI)</td>
+            <td><nobr><b>Column 36 (AJ)</td>
             <td><nobr>Pathway (SMPDB)</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 36 (AJ)</td>
+            <td><nobr><b>Column 37 (AK)</td>
             <td><nobr>Pathway (Wikipathways)</td>
         </tr>
     </tbody>
@@ -627,12 +653,66 @@ The table below shows the contents of [setname]_all_peaks_go_pathway_annotated.t
 
 <br>
 
+## Motif enrichment analysis results (by HOMER)
+
+All the results are compiled and can be viewed by opening the file homerResults.html in an HTML file viewer such as your internet browser. This file gives you a formatted, organized view of the enriched de novo motifs and all the relevant information, as can be seen below. Additionally, more details can be accessed by simply clicking on the links in the table.
+
+<img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/HOMER_motif_results.png>
+
+We can see these information listed below from the table:
+
+| Column Name | Definition |
+|-|-|
+| Rank | Motif Rank | 
+| Motif | Motif position weight matrix logo | 
+| P-value | Final enrichment p-value | 
+| log P-pvalue | Log of p-value |
+| % of Targets | Number of target sequences with motif/ total targets | 
+| % of Background | Number of background sequences with motif/ total background | 
+| STD(Bg STD) | Standard deviation of position in target and background sequences | 
+| Best Match/Details | Best match of de novo motif to motif database | 
+
+In addition to de novo motif enrichment, homer also performs motif enrichment analysis on the known binding motifs readily available within their database repertoire. The results for this analysis can be viewed in a similar way by opening the file knownResults.html, which contains similar information as its de novo counterpart.
+
+More detailed information is available in http://homer.ucsd.edu/homer/ngs/peakMotifs.html
+
+<br>
+
+## Motif enrichment analysis results (by MEME)
+
+All the results are compiled and can be viewed by opening the file meme-chip.html in an HTML file viewer such as your internet browser. This file gives you a formatted, organized view of the enriched de novo motifs and all the relevant information. Additionally, more details can be accessed by simply clicking on the links in the table. 
+
+In datasets where there is an equal number of multiple-replicated ChIP and control samples, ChIP-AP will have MEME perform a pair-wise motif enrichment analysis. Therefore, in that case, there will be multiple replicates of motif enrichment results, each one looking like below.
+
+<img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/MEME_motif_results.png>
+
+While the file above gives a more graphical representation of the results, meme-chip also generates another file: summary.tsv, which contains the same information (see below) repackaged in table format suitable for subsequent processing, if needed.
+
+| Column Name | Definition |
+|-|-|
+| MOTIF_INDEX | The index of the motif in the "Motifs in MEME text format" file ('combined.meme') output by MEME-ChIP. |
+| MOTIF_SOURCE | The name of the program that found the de novo motif, or the name of the motif file containing the known motif. |
+| MOTIF_ID | The name of the motif, which is unique in the motif database file. | 
+| ALT_ID | An alternate name for the motif, which may be provided in the motif database file. | 
+| CONSENSUS | The ID of the de novo motif, or a consensus sequence computed from the letter frequencies in the known motif (as described below). | 
+| WIDTH | The width of the motif. | 
+| SITES | The number of sites reported by the de novo program, or the number of "Total Matches" reported by CentriMo. | 
+| E-VALUE | The statistical significance of the motif. | 
+| E-VALUE_SOURCE | The program that reported the E-value. | 
+| MOST_SIMILAR_MOTIF | The known motif most similar to this motif according to Tomtom. | 
+| URL | A link to a description of the most similar motif, or to the known motif. | 
+
+More detailed information is available in https://meme-suite.org/meme/doc/meme-chip.html
+
+<br>
+
 ## Miscellaneous Pipeline Outputs
 ### Multiple peak callers statistics summary
 The table below shows the contents of [setname]_peak_caller_combinations_statistics.tsv.
 
+| Column # | Peak Set Attribute |
+|-|-|
 | <b>Column 1 (A) | Peak Callers Combination |
-| - | - |
 | <b>Column 2 (B) | Exclusive Peak Count |
 | <b>Column 3 (C) | Exclusive Positive Peak Count |
 | <b>Column 4 (D) | Exclusive Motif Count |
@@ -678,7 +758,7 @@ This file summarizes the assignment of the files (IP sample or control, read 1 o
 ### Pipeline Run Command
 Contains the  command line that was used to call the pipeline in a text file: [setname]_command_line.txt in the output save folder. This is useful for documentation of the run, and for re-running of the pipeline after a run failure or some tweaking if need be.
 
-    [chipap directory]/chipap_xx.py --mode paired --ref hg38 --genome [path_to_genome_folder] --output [full_path_to_output_save_folder] --setname [dataset name] --sample_table [path_to_sample_table_file] --custom_setting_table [path_to_setting_table_file].tsv --motif [path_to_known_motif_file] --fcmerge --goann --pathann --deltemp --thread [#_of_threads_to_use] --run
+    [chipap directory]/chipap.py --mode paired --ref hg38 --genome [path_to_genome_folder] --output [full_path_to_output_save_folder] --setname [dataset name] --sample_table [path_to_sample_table_file] --custom_setting_table [path_to_setting_table_file].tsv --motif [path_to_known_motif_file] --fcmerge --goann --pathann --deltemp --thread [#_of_threads_to_use] --run
 
 <br>
 
@@ -731,6 +811,9 @@ Below is an example of setting table file in its default-setting state:
 | <b>homer_mergePeaks |  |
 | <b>homer_annotatePeaks |  |
 | <b>fold_change_calculator | --normfactor uniquely_mapped |
+| <b>homer_findMotifsGenome | -size given -mask | 
+| <b>meme_chip | -meme-nmotifs 25 |
+
 
 As can be seen, certain flags and values for some programs have been preset as per our testing and opinions. A point to note however, some flags for programs, such as -BAMPE in MACS2, are not listed since they are “hard-coded” into the pipeline and cannot be modified. For this example of -BAMPE in MACS2, this is “hard-coded” because this flag is essential for running peak calling in paired-end datsets. Parameters and flags like this that must be set are “hard-coded” and hidden and cannot be changed unless by choosing the appropriate narrow/broad run modes. A listing of all these “hard-coded” parameters can be found in the next section.
 
@@ -746,6 +829,9 @@ Below however is a listing of the values listed above in the default-settings wi
 | GEM | -Xmx10G<br>--k_min 8<br>--k_max 12 | As GEM is java jar package, the amount of ram required to run needs to be specified. For this, the -Xmx10G flag is used which allocates 10Gb of ram for GEM to run. This can (and probably) should be increased if your system has the ram to accommodate it, to avoid any potential issues with out of memory errors and crashes. The –k_min and –k_max flags instruct GEM to search for kmers between 8 and 12bp. Depending on your datset you may need to change this, but for defaults these values will suffice. |
 | Genrich | --adjustp | This flag is NOT part of Genrich’s default behaviour. We noted aberrant peak calling with low coverage datasets in our dataset and confirmed this behaviour with the developer in private communications. Through our testing, we derived equations that allow us to curtail Genrich’s aberrant behaviour in such scenarios. This adjustment is performed and derived by us and is not attirubuted to Genrich and/or its developer(s). |
 | FC Calculator | --normfactor<br>uniquely_mapped | This flag instructs the fold-change calculator script to only consier uniquely-mapped reads in the fold-change calculation. While multi-mapped reads might be important to consider in some scenario’s, we deemed it more accurate to calculate FC based on uniquely-mapped reads. | 
+| HOMER<br>findMotifsGenome | -size given<br>-mask | These instruct findMotifsGenome to perform motif enrichment analysis based on the original size of the sequences based on the peak widths, with the genomic repeat sequences masked (discounted from contributing to the motif enrichment). | 
+| meme-chip | -meme-nmotifs 25 | This instructs meme-chip to find up to 25 top enriched motifs. Any more than rank 25 typically has too low enrichment values to be considered as a true binding event. |
+
 
 <br>
 
@@ -1125,6 +1211,33 @@ In other words: <u>AVOID</u> providing any of these flags or giving any argument
             <td>Sample peak type</td>
             <td>Determined by ChIP-AP --peak</td>
         </tr>
+        <tr>
+            <td rowspan=2><b>HOMER<br>findMotifsGenome</td>
+            <td>-p</td>
+            <td>Number of threads that will be used to run this</td>
+            <td>Determined by ChIP-AP –thread</td>
+        </tr>
+        <tr>
+            <td>-dumpFasta</td>
+            <td>Flag to include fasta files of the analyzed sequences in the output</td>
+            <td>Locked on; useful but not mandatory for subsequent processes for now</td>
+        </tr>
+        <tr>
+            <td rowspan=3><b>MEME<br>meme-chip</td>
+            <td>-oc</td>
+            <td>Path to output folder</td>
+            <td>Locked by ChIP-AP file naming and pathing</td>
+        </tr>
+        <tr>
+            <td>-neg</td>
+            <td>Path to background sequences fasta</td>
+            <td>Locked by ChIP-AP file naming and pathing</td>
+        </tr>
+        <tr>
+            <td>-meme-p</td>
+            <td>Number of threads that will be used to run this</td>
+            <td>Determined by ChIP-AP –thread</td>
+        </tr>
     </tbody>
 </table>
 
@@ -1272,14 +1385,72 @@ There are a couple of things to look for to answer this question. 1, the fingerp
 
 <br>
 
-## References and Citations
+
+## Version Update Changelogs
+Version 4.1
+- Published version of ChIP-AP. First version to be released on GitHub.
+
+Version 5.0
+- Second version to be released on GitHub.
+- Peak type "unsure" is now available as an optional argument for the --peak flag.
+    - When peak type is "unsure", ChIP-AP will run twice, sequentially, not altogether.
+    - First run with narrow peak type settings. Second run with broad peak type settings.
+    - Results and other files will be stored in folder [setname]_narrow and [setname]_broad
+    - The same settings table will be used for both runs.
+- Motif enrichment analysis by HOMER and MEME are now integrated into ChIP-AP.
+    - ChIP-AP now is able to run motif enrichment analysis based on the consensus and/or union sets of the detected peaks
+    - HOMER's findMotifsGenome.pl module performs the first motif enrichment analysis
+        - Only available when processing narrow peaks dataset (--peak narrow)
+        - Will be performed when user includes --homer_motif [consensus/union/both] flag argument in ChIP-AP command line
+        - The results will be stored in a new folder 24_homer_motif_enrichment
+    - MEME's meme-chip module performs the second motif enrichment analysis  
+        - Only available when processing narrow peaks dataset (--peak narrow)
+        - Will be performed when user includes --meme_motif [consensus/union/both] flag argument in ChIP-AP command line
+        - The results will be stored in a new folder 25_meme_motif_enrichment
+- fold_change_calculator_suite_3.0.py replaces fold_change_calculator_suite_2.1.py
+    - Now adds each replicate's peak center coordinate into the resulting file: setname_all_peaks_calculated.tsv
+    - Weighted peak center coordinate for narrow peak type, and simply peak mid-point coordinate for broad peak type
+    - Weighted peak center coordinate value is needed for the new script meme_sequence_extractor_5.0.py
+- A home-made script meme_sequence_extractor_5.0.py is added into the pipeline
+    - Needed for automated preparation of meme-chip FASTA-formatted target and background inputs
+    - Recognizes and processes multiple replicates separately (based on each weighted peak center coordinate). meme-chip then follows up by processing each replicate separately, generating respective results for each replicate
+    - Only when ChIP and control aligned reads (.bam) are not merged or force-merged
+- chipap_dashboard_2.0.py replaces the older chipap_dashboard.py (1.0)
+    - Now supports unsure peak type
+    - Now supports motif enrichment analysis by HOMER and MEME
+    - Now supports real time detection of manually typed-in sample table, settings table, and known motifs file
+- chipap_wizard_2.0.py replaces the older chipap_wizard.py (1.0)
+    - Now supports unsure peak type
+    - Now supports motif enrichment analysis by HOMER and MEME
+    - Now supports real time detection of manually typed-in sample table, settings table, and known motifs file
+    - A few minor tweaks on the data inputting flow
+- For consistencies in codes between different versions of scripts, versions are removed from script file name. Additionally, the wording "suite" in several scripts does not really make sense, so we removed them.
+    - chipap_v5.0.py --> chipap.py
+    - Genrich_1.0.py --> Genrich.py
+    - fold_change_calculator_suite_3.0.py --> fold_change_calculator.py
+    - meme_sequence_extractor_5.0.py --> meme_sequence_extractor.py
+    - GO_annotate_suite_1.1.py --> GO_annotator.py
+    - pathway_annotate_suite_1.1.py --> pathway_annotator.py
+    - peak_caller_stats_suite.py --> peak_caller_stats_calculator.py
+    - chipap_dashboard_2.0.py --> chipap_dashboard.py
+    - chipap_wizard_2.0.py --> chipap_wizard.py
+- File default_settings_table has been renamed to default_settings_table.tsv
+    - To better reflect its table format
+- Software update check implemented at the beginning of pipeline.
+    - Informing users of newer version of ChIP-AP script(s) available on GitHub.
+
+
+<br>
+
+
+## Manuals and Citations
 You can find all the details of every individual program through the links provided in the table below. Reading these is strongly recommended if you plan to modify ChIP-AP default settings. 
 
 Lastly, if you use ChIP-AP in your analysis, please cite us and all the following programs.
 
 | Program | Reference |
 |-|-|
-| ChIP-AP<br>v4.1 | Guide: https://github.com/JSuryatenggara/ChIP-AP/wiki/ChIP-AP-Guide<br>Github: https://github.com/JSuryatenggara/ChIP-AP<br>Citation: Coming Soon! |
+| ChIP-AP<br>v5.0 | Guide: https://github.com/JSuryatenggara/ChIP-AP/wiki/ChIP-AP-Guide<br>Github: https://github.com/JSuryatenggara/ChIP-AP<br>Citation: https://www.biorxiv.org/content/10.1101/2021.04.18.440382v1 |
 | Python3<br>Linux 3.7.x / 3.8.x<br>macOS 3.7.x | We have noted in our testing that there is a change in python 3.8 on macOS in how multi-threading is handled which breaks ChIP-AP.  As such, for macOS installs you must ensure that ptyhon3.7.x is installed.  If using our installation guides, the provided yml files will ensure all the correct dependencies and requirements are met automatically.<br>|
 | FastQC<br>v0.11.9 | Guide: https://www.bioinformatics.babraham.ac.uk/projects/fastqc/<br>GitHub: https://github.com/s-andrews/FastQC |
 | Clumpify<br>v38.18 (BBmap) | Introduction: https://www.biostars.org/p/225338/<br>Guide: https://jgi.doe.gov/data-and-tools/bbtools/bb-tools-user-guide/clumpify-guide/<br>GitHub: https://github.com/BioInfoTools/BBMap/blob/master/sh/clumpify.sh<br>Citation: https://www.osti.gov/biblio/1241166-bbmap-fast-accurate-splice-aware-aligner
@@ -1287,11 +1458,14 @@ Lastly, if you use ChIP-AP in your analysis, please cite us and all the followin
 | Trimmomatic<br>v0.39 | Guide: http://www.usadellab.org/cms/?page=trimmomatic<br>Downloadable manual page: http://www.usadellab.org/cms/uploads/supplementary/Trimmomatic/TrimmomaticManual_V0.32.pdf<br>GitHub: https://github.com/timflutre/trimmomatic<br>Citation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4103590/ |
 | bwa<br>v0.7.17 | Guide: http://bio-bwa.sourceforge.net/bwa.shtml<br>GitHub: https://github.com/lh3/bwa<br>Citation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2705234/ | 
 | samtools view<br>v1.9 (samtools) | Guide: http://www.htslib.org/doc/samtools-view.html<br>GitHub: https://github.com/samtools/samtools<br>Citation: https://pubmed.ncbi.nlm.nih.gov/19505943/<br> | 
-| deeptools plotFingerprint<br>v3.5.0 (deepTools) | Guide: https://deeptools.readthedocs.io/en/develop/content/tools/plotFingerprint.html<br>Citation: https://academic.oup.com/nar/article/44/W1/W160/2499308?login=true |
+| deeptools<br>plotFingerprint<br>v3.5.0 (deepTools) | Guide: https://deeptools.readthedocs.io/en/develop/content/tools/plotFingerprint.html<br>Citation: https://academic.oup.com/nar/article/44/W1/W160/2499308?login=true |
 | MACS2<br>v2.2.6 | Guide: https://hbctraining.github.io/Intro-to-ChIPseq/lessons/05_peak_calling_macs.html<br>Citation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2732366/<br>GitHub: https://github.com/macs3-project/MACS/wiki |
 | GEM<br>v2.7 | Guide: https://groups.csail.mit.edu/cgs/gem/<br>GitHub: https://github.com/gifford-lab/GEM<br>Citation: https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1002638 |
 | SICER2<br>v1.0.2 | Guide: https://zanglab.github.io/SICER2/<br>GitHub: https://github.com/bioinf/SICER2<br>Citation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2732366/ | 
-| HOMER findPeaks<br>v4.11 (HOMER) | Guide: http://homer.ucsd.edu/homer/ngs/peaks.html<br>Citation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2898526/ |
+| HOMER<br>findPeaks<br>v4.11 (HOMER) | Guide: http://homer.ucsd.edu/homer/ngs/peaks.html<br>Citation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2898526/ |
 | Genrich<br>v0.6 | Guide: https://informatics.fas.harvard.edu/atac-seq-guidelines.html<br>GitHub: https://github.com/jsh58/Genrich |
-| HOMER mergePeaks<br>v4.11 (HOMER) | Guide: http://homer.ucsd.edu/homer/ngs/mergePeaks.html<br>Citation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2898526/ |
-| HOMER annotatePeaks<br>v4.11 (HOMER) | Guide: http://homer.ucsd.edu/homer/ngs/annotation.html<br>Citation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2898526/ |
+| HOMER<br>mergePeaks<br>v4.11 (HOMER) | Guide: http://homer.ucsd.edu/homer/ngs/mergePeaks.html<br>Citation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2898526/ |
+| HOMER<br>annotatePeaks<br>v4.11 (HOMER) | Guide: http://homer.ucsd.edu/homer/ngs/annotation.html<br>Citation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2898526/ |
+| HOMER<br>findMotifsGenome<br>v4.11 (HOMER) | Guide: http://homer.ucsd.edu/homer/ngs/peakMotifs.html<br>Citation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2898526/
+| MEME<br>meme-chip<br>V5.0.5 (MEME) | Guide: https://meme-suite.org/meme/doc/meme-chip.html<br> Citation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2703892/ | 
+
