@@ -3719,13 +3719,12 @@ if peak_type == 'narrow':
 
     # Bash commands to call meme-chip to perform motif enrichment analysis based on ChIP-AP consensus peak set. One command, one run for every one replicate.
     for list_counter in range(len(fasta_suffix_list)):
-        meme_motif_enrichment_consensus_script.write('meme-chip -oc {}/motif_analysis{} -neg {}/background{}.fa {} -meme-p {} {}/target{}.fa 1> {}/logs/{}.MEMEmotifenrichment_consensus{}.out 2> {}/logs/{}.MEMEmotifenrichment_consensus{}.err\n\n'.format(
+        meme_motif_enrichment_consensus_script.write('meme-chip -oc {}/motif_analysis{} -neg {}/background{}.fa {} {}/target{}.fa 1> {}/logs/{}.MEMEmotifenrichment_consensus{}.out 2> {}/logs/{}.MEMEmotifenrichment_consensus{}.err &\n\n'.format(
             meme_motif_enrichment_consensus_dir,
             fasta_suffix_list[list_counter],
             meme_motif_enrichment_consensus_dir,
             fasta_suffix_list[list_counter],
             meme_chip_arg,
-            cpu_count, 
             meme_motif_enrichment_consensus_dir,
             fasta_suffix_list[list_counter],
             meme_motif_enrichment_dir,
@@ -3734,6 +3733,8 @@ if peak_type == 'narrow':
             meme_motif_enrichment_dir,
             dataset_name,
             fasta_suffix_list[list_counter]))
+
+    meme_motif_enrichment_consensus_script.write('wait\n\n')
 
     meme_motif_enrichment_consensus_script.close() # Closing the script 'meme_motif_enrichment_consensus_script.sh'. Flushing the write buffer
 
@@ -3756,13 +3757,12 @@ if peak_type == 'narrow':
 
     # Bash commands to call meme-chip to perform motif enrichment analysis based on ChIP-AP union peak set. One command, one run for every one replicate.
     for list_counter in range(len(fasta_suffix_list)):
-        meme_motif_enrichment_union_script.write('meme-chip -oc {}/motif_analysis{} -neg {}/background{}.fa {} -meme-p {} {}/target{}.fa 1> {}/logs/{}.MEMEmotifenrichment_union{}.out 2> {}/logs/{}.MEMEmotifenrichment_union{}.err\n\n'.format(
+        meme_motif_enrichment_union_script.write('meme-chip -oc {}/motif_analysis{} -neg {}/background{}.fa {} {}/target{}.fa 1> {}/logs/{}.MEMEmotifenrichment_union{}.out 2> {}/logs/{}.MEMEmotifenrichment_union{}.err &\n\n'.format(
             meme_motif_enrichment_union_dir,
             fasta_suffix_list[list_counter],
             meme_motif_enrichment_union_dir,
             fasta_suffix_list[list_counter],
             meme_chip_arg,
-            cpu_count, 
             meme_motif_enrichment_union_dir,
             fasta_suffix_list[list_counter],
             meme_motif_enrichment_dir,
@@ -3771,6 +3771,8 @@ if peak_type == 'narrow':
             meme_motif_enrichment_dir,
             dataset_name,
             fasta_suffix_list[list_counter]))
+
+    meme_motif_enrichment_union_script.write('wait\n\n')
 
     meme_motif_enrichment_union_script.close() # Closing the script 'meme_motif_enrichment_union_script.sh'. Flushing the write buffer
 
@@ -3874,9 +3876,8 @@ if args.homer_motif and peak_type == 'narrow': # Motif enrichment analyses are o
 
     if args.homer_motif == 'both': # If user wants analysis on both peak sets
         master_script.write('echo Performing motif enrichment analysis on the consensus peak set with HOMER findMotifsGenome.pl\n')
-        master_script.write('{}\n\n'.format(homer_motif_enrichment_consensus_script_name))
-
         master_script.write('echo Performing motif enrichment analysis on the union peak set with HOMER findMotifsGenome.pl\n')
+        master_script.write('{} &\n\n'.format(homer_motif_enrichment_consensus_script_name))
         master_script.write('{}\n\n'.format(homer_motif_enrichment_union_script_name))
 
 if args.meme_motif and peak_type == 'narrow': # Motif enrichment analyses are only performed on datasets with narrow peaks
@@ -3890,9 +3891,8 @@ if args.meme_motif and peak_type == 'narrow': # Motif enrichment analyses are on
 
     if args.meme_motif == 'both': # If user wants analysis on both peak sets
         master_script.write('echo Performing motif enrichment analysis on the consensus peak set with meme-chip\n')
-        master_script.write('{}\n\n'.format(meme_motif_enrichment_consensus_script_name))
-
         master_script.write('echo Performing motif enrichment analysis on the union peak set with meme-chip\n')
+        master_script.write('{} &\n\n'.format(meme_motif_enrichment_consensus_script_name))
         master_script.write('{}\n\n'.format(meme_motif_enrichment_union_script_name))
 
 master_script.close() # Closing the script 'MASTER_script.sh'. Flushing the write buffer
