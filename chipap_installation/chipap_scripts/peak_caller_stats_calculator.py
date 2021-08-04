@@ -2,7 +2,7 @@
 #pyright: reportUnboundVariable=false
 
 
-# script_version = '1.0'
+script_version = '1.0'
 
 
 print('Running statistics analysis on each peak caller combination')

@@ -2,7 +2,26 @@
 #pyright: reportUnboundVariable=false
 
 
-# script_version = '5.0'
+script_version = '1.1'
+
+# Generates sequences for MEME-suite input based on fold-change-calculated peak list (ChIP-AP: dataset_name_all_peaks_calculated.tsv), featuring:
+#   - Optional resizing of sequences length
+#   - Optional resampling of number of sequences
+#   - Optional masking of genomic regions with repeat sequences
+#   - Optional generation of background control sequences
+#   - Optional customization of background sequences GC% content
+#   - Optional filtering to include only a subset of peaks called by specific peak caller(s)
+
+# INPUT     - "dataset_name_all_peaks_calculated" - fold-change-calculated peak list
+#           - Reference genome FASTA sequence
+#           - Reference genome chromosome sizes
+
+# OUTPUT    - "targets.fa" - Sequences of the peaks in the complete peak list for MEME-suite motif enrichment analysis 
+#           - "background.fa" - Optional. Randomized background control sequences from the same genome for MEME-suite motif enrichment analysis 
+
+# PATCH NOTES
+#   Version 1.1     No longer needs hard-masked version of the reference genome in order to run --masked mode
+#                   - Lowercase characters from the standard version of the reference genome (soft-masked) are now automatically converted to N
 
 
 import pysam
@@ -23,7 +42,9 @@ print('\nParsing command line flags and arguments...')
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--input', required = True)
+parser.add_argument('--input',
+                    help = '<Required> Your fold-change-calculated peak list (ChIP-AP: dataset_name_all_peaks_calculated.tsv)',
+                    required = True)
 
 parser.add_argument('--fastadir', 
                     help = '<Required> Your reference genome FASTA file folder.', 
@@ -79,13 +100,7 @@ chr_size_dir_full_path = os.path.abspath(args.chrsizedir)
 input_full_path = os.path.abspath(args.input)
 output_dir_full_path = os.path.abspath(args.outputdir)
 
-# Modify the version of genome reference FASTA and chromosome sizes file to be used (masked or unmasked)
-if args.masked:
-    genome_ref = args.ref + '_masked'
-if not args.masked:
-    genome_ref = args.ref
-
-fasta_full_path = os.path.abspath('{}/{}.fa'.format(fasta_dir_full_path, genome_ref))
+fasta_full_path = os.path.abspath('{}/{}.fa'.format(fasta_dir_full_path, args.ref))
 chr_size_full_path = os.path.abspath('{}/{}.chrom.sizes'.format(chr_size_dir_full_path, args.ref))
 
 
@@ -173,7 +188,7 @@ genome_pysam = pysam.Fastafile(fasta_full_path)
 chr_size_df = pd.read_csv(chr_size_full_path, delimiter = '\t', header = None)
 chr_size_dict = dict(chr_size_df.values)
 
-# Read the peak list ([setname]_all_peaks_calculated with peak center value(s)).
+# Read the peak list (dataset_name_all_peaks_calculated.tsv)
 input_df = pd.read_csv(input_full_path, delimiter = '\t')
 input_array = input_df.values.tolist()
 input_header = input_df.columns.tolist()
@@ -250,6 +265,18 @@ for filtered_input_array_row in filtered_input_array:
     center_list = filtered_input_array_row[(np.min(np.array(center_column_number_list))) : (np.max(np.array(center_column_number_list)) + 1)] # Contains multiple values if exist.
 
     sequence = genome_pysam.fetch(chr, start, end) # Use the pysam object defined in the beginning to rapidly access and read the sequence
+    
+    if args.masked: # If --masked flag is used
+        if not sequence.isupper(): # If the current pulled sequence has at least one lowercase character
+            masked_sequence = [] # Prepare for the conversion into hard-masked sequence
+
+            for base in sequence: # Read the sequence one by one from the left
+                if base.isupper(): # If the current base is in uppercase
+                    masked_sequence.append(base) # No change, write it as is in the hard-masked sequence
+                elif base.islower(): # If the current base is in lowercase
+                    masked_sequence.append('N') # Mask it, write is as N in the hard-masked sequence
+            
+            sequence =  ''.join(masked_sequence) # Join all the base characters in the list into a string
 
     info = [chr, start, end, sequence, center_list] # Info refers to complete information on a peak
 
@@ -376,6 +403,18 @@ if (args.length == 'auto' and args.background) or args.length != 'auto': # Resiz
                 resized_end_list.append(resized_end) # Append the end coordinate of this replicate
 
             resized_sequence = genome_pysam.fetch(chr, resized_start, resized_end) # Use the pysam object defined in the beginning to rapidly access and read the sequence
+
+            if args.masked:
+                if not resized_sequence.isupper():
+                    masked_sequence = []
+                    
+                    for base in resized_sequence:
+                        if base.isupper():
+                            masked_sequence.append(base)
+                        elif base.islower():
+                            masked_sequence.append('N')
+                    
+                    resized_sequence =  ''.join(masked_sequence)
 
             resized_sequence_list.append(resized_sequence) # Append the sequence of this replicate returned by pysam
 
@@ -540,6 +579,18 @@ if args.background:
                 background_start = random.randint(0, (chr_size_dict[background_chr] - background_length)) # Set a randomized sequence start coordinate within acceptable range
                 background_end = background_start + background_length # Set an end coordinate based on the randomized start coordinate
                 background_sequence = genome_pysam.fetch(background_chr, background_start, background_end) # Get the sequence based on the randomized chr, start, and end coordinate above
+                
+                if args.masked:
+                    if not background_sequence.isupper():
+                        masked_sequence = []
+
+                        for base in background_sequence:
+                            if base.isupper():
+                                masked_sequence.append(base)
+                            elif base.islower():
+                                masked_sequence.append('N')
+
+                        background_sequence = ''.join(masked_sequence)
 
                 # This sequence's G or C counter + 1 if G or C
                 background_GC_instances = (background_sequence.count('A') + background_sequence.count('T') + background_sequence.count('a') + background_sequence.count('t')) 

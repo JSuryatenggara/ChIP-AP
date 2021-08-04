@@ -2,7 +2,7 @@
 #pyright: reportUnboundVariable=false
 
 
-# script_version = '2.0'    - When installing ChIP-AP in its own environment, the environment name will now be the name
+# script_version = '2.1'    - When installing ChIP-AP in its own environment, the environment name will now be the name
 #                               user typed in when prompted in the terminal, instead of "python3_chipap"
 #                           - Replaces the "name:" and "prefix:" lines in the .yml file(s) if they already exist
 #                           - Adds the "name:" and "prefix:" lines into the .yml file(s) if they did not yet exist
@@ -13,8 +13,6 @@ import shutil
 import subprocess
 import sys
 import os
-import time
-import pandas as pd
 
 
 # Function to search the input_file for a line containing old_string, then replace that whole line with the new_string
@@ -74,6 +72,7 @@ if sys.platform == "linux" or sys.platform == "linux2": # Execute this if the in
 
     with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'w') as modified_yml: modified_yml.write('{}\n'.format(name_string) + ''.join(new_yml_contents) + '{}\n'.format(prefix_string)) # Insert the environment name as the first item in the list and the environment directory (prefix) as the last item in the list
 
+
 elif sys.platform == "darwin": # Execute this instead if the installation platform is MacOS
     subprocess.run('/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"', shell = True)
     subprocess.run('brew install wget', shell = True)
@@ -88,6 +87,7 @@ elif sys.platform == "darwin": # Execute this instead if the installation platfo
     with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'w') as modified_yml: modified_yml.write('{}\n'.format(name_string) + ''.join(new_yml_contents) + '{}\n'.format(prefix_string)) # Insert the environment name as the first item in the list and the environment directory (prefix) as the last item in the list
     subprocess.run('pip install pandas', shell = True)
 
+
 if user_answer.lower() == 'y': # Execute this if user is installing ChIP-AP in a newly created environment
     subprocess.run('conda env create -f {}/chipap_{}.yml'.format(sys.path[0], user_environment), shell = True)
 
@@ -97,6 +97,15 @@ if user_answer.lower() == 'n': # Execute this if user is installing ChIP-AP in t
 subprocess.run('chmod +x {}/chipap_scripts/*'.format(sys.path[0]), shell = True) # Mark all scripts in folder "chipap_scripts" as executable
 
 subprocess.run('chmod +x {}/homer_genome_update.sh'.format(sys.path[0]), shell = True) # Mark the script "homer_genome_update.sh" as executable
+
+
+# Find every instance of idr.py script in the ChIP-AP installation conda environment and put them all into a list
+popen_idr = subprocess.Popen('find {} -name "idr.py"'.format(chipap_env_dir), shell = True, stdout = subprocess.PIPE)
+idr_full_path_list = popen_idr.communicate()[0].decode("utf-8").split()
+
+for idr_full_path in idr_full_path_list: # For every instance of idr.py script found above
+    print("Replacing installed stock IDR script ({}) with ChIP-AP's patched IDR script ({}/idr.py)".format(idr_full_path, sys.path[0]))
+    shutil.copy('{}/idr.py'.format(sys.path[0]), idr_full_path) # Replace the "broken" stock IDR script with the patched one provided by ChIP-AP installation package
 
 
 genome_folder_full_path = "genome_folder_full_path = '{}/genomes'".format(sys.path[0]) # Define the new path to genome folder based on installation directory
@@ -140,6 +149,7 @@ if sys.platform == "linux" or sys.platform == "linux2":  # Execute this instead 
         if path_exist == 0: # If it is not found until the end of the lines
             file.write('{}\n'.format(path_to_chipap_scripts)) # Write the path to the directory "chipap_scripts" so the scripts within can be accessed from any directory
     subprocess.run('exec bash', shell = True) # reload bashrc
+
 
 elif sys.platform == "darwin":  # Execute this instead if the installation platform is MacOS
     subprocess.run('cp ./gem_macOS.zip {}/'.format(chipap_env_dir), shell = True)

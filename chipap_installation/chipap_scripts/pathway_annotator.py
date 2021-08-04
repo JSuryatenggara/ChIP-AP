@@ -2,13 +2,14 @@
 #pyright: reportUnboundVariable=false
 
 
-# script_version = '1.1'
+script_version = '1.2'
 
 
 # PATCH NOTES
 #   Version 1.1     Written due to some term lists exceeding characters limit per cell when viewed in spreadsheet application
 #                       Bracketed string removed from each term to save character space in each term list
-#                       If a term list still exceeds the character limit, anything beyond the 32000th character is removed 
+#                       If a term list still exceeds the character limit, anything beyond the 32000th character is removed
+#   Version 1.2     Added a function to remove 'IDR vs Peakset' column(s) if present
 
 
 
@@ -47,8 +48,6 @@ parser.add_argument('--go_folder',
 args = parser.parse_args()
 
 
-
-current_dir = os.getcwd()
 
 subprocess.run('ulimit -n 2000', shell = True)
 
@@ -309,13 +308,25 @@ if __name__ == '__main__':
 
         print('Parsing header names for columns containing target data')
         # Parsing for the column containing Entrez ID in the annotated peak list
+
+        individual_IDR_columns_present = 'no'
+
         for peak_header_counter in range(len(peak_header)):
             if 'Entrez' in peak_header[peak_header_counter]:
                 peak_entrez_ID_column_number = peak_header_counter
+
+            if 'IDR vs Peakset' in peak_header[peak_header_counter]:
+                first_peak_IDR_column_number = peak_header_counter
+                individual_IDR_columns_present = 'yes'
+                peak_header = peak_header[:first_peak_IDR_column_number]
+                break
                 
         print('Reading the opened file and loading the contents into arrays')
         for peak_data_line in peak_data:
-            peak_array.append(peak_data_line.split('\t'))
+            if individual_IDR_columns_present == 'yes':
+                peak_array.append((peak_data_line.split('\t')[:first_peak_IDR_column_number]))
+            if individual_IDR_columns_present == 'no':
+                peak_array.append(peak_data_line.split('\t'))
 
 
 ########################################################################################################################

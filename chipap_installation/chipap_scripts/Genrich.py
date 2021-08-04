@@ -2,7 +2,7 @@
 #pyright: reportUnboundVariable=false
 
 
-# script_version = '1.0'
+script_version = '1.0'
 
 
 # Usage: ./Genrich  -t <file>  -o <file>  [optional arguments]

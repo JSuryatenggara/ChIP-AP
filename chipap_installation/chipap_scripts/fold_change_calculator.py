@@ -2,7 +2,7 @@
 #pyright: reportUnboundVariable=false
 
 
-# script_version = '5.0'
+script_version = '3.1'
 
 
 # Processes the peak list file "dataset_name_all_peaks_annotated" by:
@@ -30,7 +30,9 @@
 #                       Just like tag counts and fold change, this weighted peak center is replicate-wise
 #                       Due to the absence of weighted peak center in broad peaks, weighted peak center is replaced by 
 #                           simply the midpoint between the broad peak's start and end coordinates
-
+#
+#   Version 3.1     Generates narrowPeak- or broadPeak-formatted output for downstream peak IDR calculation
+#                   "Strand" column now contains all "." values instead of all "+" values to better represent the strandless nature of the peaks
 
 
 print('Importing required modules')
@@ -280,11 +282,9 @@ parser.add_argument('--ctrl_norm',
 
 args = parser.parse_args()
 
-current_dir = os.getcwd()
+
 
 subprocess.run('ulimit -n 2000', shell = True)
-
-
 
 print('Parsing arguments')
 cpu_count = args.thread
@@ -300,196 +300,260 @@ ctrl_bam_absolute_path, ctrl_bam_name, ctrl_bam_extension = file_basename_parsin
 
 
 
-if __name__ == '__main__':
+print('Opening file: {}'.format(input_tsv_full_path)) # Reading the HOMER annotated peak file
+peak_df = pd.read_csv(input_tsv_full_path, delimiter = '\t')
+peak_df.sort_values(by = ['Chr', 'Start'], inplace = True) # Sorting the peaks list based on chromosomal position
+peak_header = peak_df.columns.tolist()
 
-    print('Opening file: {}'.format(input_tsv_full_path)) # Reading the HOMER annotated peak file
-    peak_df = pd.read_csv(input_tsv_full_path, delimiter = '\t')
-    peak_df.sort_values(by = ['Chr', 'Start'], inplace = True) # Sorting the peaks list based on chromosomal position
-    peak_header = peak_df.columns.tolist()
+peak_df['Peak ID'] = peak_df.apply(lambda peak_df: peak_ID_generator_function(peak_df['Chr'], peak_df['Start'], peak_df['End']), axis = 1)
 
-    peak_df['Peak ID'] = peak_df.apply(lambda peak_df: peak_ID_generator_function(peak_df['Chr'], peak_df['Start'], peak_df['End']), axis = 1)
-    
-    # Basically renaming the column into something that makes more sense than what's given by HOMER
-    peak_df['Peak Caller Combination']  = peak_df['Focus Ratio/Region Size'] 
-    
-    # Generating a list of number of peak caller overlaps based on the list length of
-    #   pipe-symbol-splitted-string of 'Peak Caller Combination' value
-    peak_df['Peak Caller Overlaps']     = peak_df.apply(lambda peak_df: overlap_number_calculator_function(peak_df['Peak Caller Combination']), axis = 1)
-    
-    # Generating a list of simplified information regarding the region of the peak location, relative to the nearest gene
-    # The function is to get rid of the irrelevant values in the bracket
-    peak_df['Annotation']               = peak_df.apply(lambda peak_df: annotation_simplifier_function(peak_df['Annotation']), axis = 1)
+# Basically renaming the column into something that makes more sense than what's given by HOMER
+peak_df['Peak Caller Combination']  = peak_df['Focus Ratio/Region Size'] 
 
+# Generating a list of number of peak caller overlaps based on the list length of
+#   pipe-symbol-splitted-string of 'Peak Caller Combination' value
+peak_df['Peak Caller Overlaps']     = peak_df.apply(lambda peak_df: overlap_number_calculator_function(peak_df['Peak Caller Combination']), axis = 1)
 
+# Generating a list of simplified information regarding the region of the peak location, relative to the nearest gene
+# The function is to get rid of the irrelevant values in the bracket
+peak_df['Annotation']               = peak_df.apply(lambda peak_df: annotation_simplifier_function(peak_df['Annotation']), axis = 1)
 
-    if len(chip_bam_absolute_path) == 1 and len(ctrl_bam_absolute_path) == 1:
-        # Assign column names for fold_change_calculator_function outputs in scenario where there are no multiple replicates
-        calculator_output_column_name = ['ChIP Tag Count', 'Control Tag Count', 'Fold Change', 'Peak Center']
-
-    if len(chip_bam_absolute_path) > 1 and len(ctrl_bam_absolute_path) > 1:
-        # Assign column names for fold_change_calculator_function outputs in scenario where there are multiple replicates
-        calculator_output_column_name = ['ChIP Tag Count Rep {}'.format(chip_replicate_counter + 1) for chip_replicate_counter in range(len(chip_bam_absolute_path))] + ['Control Tag Count Rep {}'.format(chip_replicate_counter + 1) for chip_replicate_counter in range(len(chip_bam_absolute_path))] + ['Fold Change Rep {}'.format(chip_replicate_counter + 1) for chip_replicate_counter in range(len(chip_bam_absolute_path))] + ['Peak Center Rep {}'.format(chip_replicate_counter + 1) for chip_replicate_counter in range(len(chip_bam_absolute_path))]
+peak_df['Strand']                   = '.'
 
 
 
-    for chip_replicate_counter in range(len(chip_bam_absolute_path)):
-        print('Running the calculator on ChIP replicate {} and {}'.format(chip_bam_name[chip_replicate_counter], ctrl_bam_name[chip_replicate_counter]))
+if len(chip_bam_absolute_path) == 1 and len(ctrl_bam_absolute_path) == 1:
+    # Assign column names for fold_change_calculator_function outputs in scenario where there are no multiple replicates
+    calculator_output_column_name = ['ChIP Tag Count', 'Control Tag Count', 'Fold Change', 'Peak Center']
 
-        current_chip_bam = chip_bam_absolute_path[chip_replicate_counter]
-        current_ctrl_bam = ctrl_bam_absolute_path[chip_replicate_counter]
+if len(chip_bam_absolute_path) > 1 and len(ctrl_bam_absolute_path) > 1:
+    # Assign column names for fold_change_calculator_function outputs in scenario where there are multiple replicates
+    calculator_output_column_name = ['ChIP Tag Count Rep {}'.format(chip_replicate_counter + 1) for chip_replicate_counter in range(len(chip_bam_absolute_path))] + ['Control Tag Count Rep {}'.format(chip_replicate_counter + 1) for chip_replicate_counter in range(len(chip_bam_absolute_path))] + ['Fold Change Rep {}'.format(chip_replicate_counter + 1) for chip_replicate_counter in range(len(chip_bam_absolute_path))] + ['Peak Center Rep {}'.format(chip_replicate_counter + 1) for chip_replicate_counter in range(len(chip_bam_absolute_path))]
 
-        # Default normalization factor
-        chip_normalization_factor_value = 1
-        # Default normalization factor
+
+
+for chip_replicate_counter in range(len(chip_bam_absolute_path)):
+    print('Running the calculator on ChIP replicate {} and {}'.format(chip_bam_name[chip_replicate_counter], ctrl_bam_name[chip_replicate_counter]))
+
+    current_chip_bam = chip_bam_absolute_path[chip_replicate_counter]
+    current_ctrl_bam = ctrl_bam_absolute_path[chip_replicate_counter]
+
+    # Default normalization factor
+    chip_normalization_factor_value = 1
+    # Default normalization factor
+    ctrl_normalization_factor_value = 1
+
+
+
+    if args.normfactor == 'mapped':
+        popen_chip_mapped = subprocess.Popen('samtools view -F4 -c {}'.format(current_chip_bam), shell = True, stdout = subprocess.PIPE)
+        # Get the number of mapped reads in the ChIP .bam file
+        chip_mapped_out = popen_chip_mapped.communicate()[0]
+        chip_mapped_read_count = int(chip_mapped_out.strip())
+        print('chip_mapped_read_count:', chip_mapped_read_count)
+
+        popen_ctrl_mapped = subprocess.Popen('samtools view -F4 -c {}'.format(current_ctrl_bam), shell = True, stdout = subprocess.PIPE)
+        # Get the number of mapped reads in the control .bam file
+        ctrl_mapped_out = popen_ctrl_mapped.communicate()[0]
+        ctrl_mapped_read_count = int(ctrl_mapped_out.strip())
+        print('ctrl_mapped_read_count:', ctrl_mapped_read_count)
+        
+        # Calculate the normalization factor for the ChIP sample read depths
+        chip_normalization_factor_value = chip_mapped_read_count / ctrl_mapped_read_count
         ctrl_normalization_factor_value = 1
 
 
 
-        if args.normfactor == 'mapped':
-            popen_chip_mapped = subprocess.Popen('samtools view -F4 -c {}'.format(current_chip_bam), shell = True, stdout = subprocess.PIPE)
-            # Get the number of mapped reads in the ChIP .bam file
-            chip_mapped_out = popen_chip_mapped.communicate()[0]
-            chip_mapped_read_count = int(chip_mapped_out.strip())
-            print('chip_mapped_read_count:', chip_mapped_read_count)
+    if args.normfactor == 'uniquely_mapped':
+        popen_chip_uniquely_mapped = subprocess.Popen('samtools view -F256 -c {}'.format(current_chip_bam), shell = True, stdout = subprocess.PIPE)
+        # Get the number of uniquely mapped reads in the ChIP .bam file
+        chip_uniquely_mapped_out = popen_chip_uniquely_mapped.communicate()[0]
+        chip_uniquely_mapped_read_count = int(chip_uniquely_mapped_out.strip())
+        print('chip_uniquely_mapped_read_count:', chip_uniquely_mapped_read_count)
 
-            popen_ctrl_mapped = subprocess.Popen('samtools view -F4 -c {}'.format(current_ctrl_bam), shell = True, stdout = subprocess.PIPE)
-            # Get the number of mapped reads in the control .bam file
-            ctrl_mapped_out = popen_ctrl_mapped.communicate()[0]
-            ctrl_mapped_read_count = int(ctrl_mapped_out.strip())
-            print('ctrl_mapped_read_count:', ctrl_mapped_read_count)
-            
-            # Calculate the normalization factor for the ChIP sample read depths
-            chip_normalization_factor_value = chip_mapped_read_count / ctrl_mapped_read_count
-            ctrl_normalization_factor_value = 1
+        popen_ctrl_uniquely_mapped = subprocess.Popen('samtools view -F256 -c {}'.format(current_ctrl_bam), shell = True, stdout = subprocess.PIPE)
+        # Get the number of uniquely mapped reads in the control .bam file
+        ctrl_uniquely_mapped_out = popen_ctrl_uniquely_mapped.communicate()[0]
+        ctrl_uniquely_mapped_read_count = int(ctrl_uniquely_mapped_out.strip())
+        print('ctrl_uniquely_mapped_read_count:', ctrl_uniquely_mapped_read_count)
 
-
-
-        if args.normfactor == 'uniquely_mapped':
-            popen_chip_uniquely_mapped = subprocess.Popen('samtools view -F256 -c {}'.format(current_chip_bam), shell = True, stdout = subprocess.PIPE)
-            # Get the number of uniquely mapped reads in the ChIP .bam file
-            chip_uniquely_mapped_out = popen_chip_uniquely_mapped.communicate()[0]
-            chip_uniquely_mapped_read_count = int(chip_uniquely_mapped_out.strip())
-            print('chip_uniquely_mapped_read_count:', chip_uniquely_mapped_read_count)
-
-            popen_ctrl_uniquely_mapped = subprocess.Popen('samtools view -F256 -c {}'.format(current_ctrl_bam), shell = True, stdout = subprocess.PIPE)
-            # Get the number of uniquely mapped reads in the control .bam file
-            ctrl_uniquely_mapped_out = popen_ctrl_uniquely_mapped.communicate()[0]
-            ctrl_uniquely_mapped_read_count = int(ctrl_uniquely_mapped_out.strip())
-            print('ctrl_uniquely_mapped_read_count:', ctrl_uniquely_mapped_read_count)
-
-            # Calculate the normalization factor for the ChIP sample read depths
-            chip_normalization_factor_value = chip_uniquely_mapped_read_count / ctrl_uniquely_mapped_read_count
-            ctrl_normalization_factor_value = 1
-        
-
-
-        if args.normfactor == 'user_value':
-            # Get the ChIP normalization factor directly from the user inputted argument
-            chip_norm_factor = args.chip_norm
-            # Get the control normalization factor directly from the user inputted argument
-            ctrl_norm_factor = args.ctrl_norm
-
-            chip_normalization_factor_value = chip_norm_factor[chip_replicate_counter]
-            ctrl_normalization_factor_value = ctrl_norm_factor[chip_replicate_counter]
-
-        print('chip_normalization_factor_value:', chip_normalization_factor_value)
-        print('ctrl_normalization_factor_value:', ctrl_normalization_factor_value)
-
-        # Getting the folder ready for the temporary samtools depth files generated in fold_change_calculator_function
-        subprocess.run('mkdir -p temp_{}'.format(chip_bam_name[chip_replicate_counter]), shell = True)
-
-
-
-        pool_calculator = multiprocessing.Pool(processes = cpu_count)
-        
-        # Takes in a list of each peak's chromosomal location codes (chr:start-end)
-        # Reads the current_chip_bam and current_ctrl_bam assigned above at those locations
-        # Returns ChIP read depth, control read depth, and fold change value at the weighted peak center of each peak
-        # Only for transcription factor target protein sample (narrow peaks)
-        if peak_type == 'narrow':
-            chip_tag_count_list, ctrl_tag_count_list, fold_change_list, peak_center_list = zip(*pool_calculator.map(fold_change_calculator_function_narrow, peak_df['Peak ID']))
-        
-
-        # Takes in a list of each peak's chromosomal location codes (chr:start-end)
-        # Reads the current_chip_bam and current_ctrl_bam assigned above at those locations
-        # Returns ChIP read count, control read count, and average fold change value along the whole range of each peak
-        # Only for histone modifier target protein sample (broad peaks)
-        if peak_type == 'broad':
-            chip_tag_count_list, ctrl_tag_count_list, fold_change_list = zip(*pool_calculator.map(fold_change_calculator_function_broad, peak_df['Peak ID']))
-            peak_center_df = (0.5 * (peak_df['Start'] + peak_df['End'])).round(0)
-            peak_center_list = peak_center_df.values.tolist()
-
-        pool_calculator.close()
-        pool_calculator.join()
-
-        # Remove the samtools depth output temporary folder
-        subprocess.run('rm -rf temp_{}'.format(chip_bam_name[chip_replicate_counter]), shell = True)
-
-
-
-        if len(chip_bam_absolute_path) == 1 and len(ctrl_bam_absolute_path) == 1:
-            # Save the final fold_change_calculator_function outputs in their appropriate pandas columns
-            peak_df['ChIP Tag Count']       = chip_tag_count_list
-            peak_df['Control Tag Count']    = ctrl_tag_count_list
-            peak_df['Fold Change']          = fold_change_list
-            peak_df['Peak Center']          = peak_center_list
-
-        if len(chip_bam_absolute_path) > 1 and len(ctrl_bam_absolute_path) > 1:
-            # Save the current fold_change_calculator_function outputs in their 
-            #   appropriate pandas columns before going for another iteration
-            peak_df['ChIP Tag Count Rep {}'.format(chip_replicate_counter + 1)]     = chip_tag_count_list
-            peak_df['Control Tag Count Rep {}'.format(chip_replicate_counter + 1)]  = ctrl_tag_count_list
-            peak_df['Fold Change Rep {}'.format(chip_replicate_counter + 1)]        = fold_change_list
-            peak_df['Peak Center Rep {}'.format(chip_replicate_counter + 1)]        = peak_center_list
-
-
-
-    motif_number_column_exist = 0
-
-    # Parsing for the existence of number of motifs column. The column might be absent if 
-    #   -motif flag was not used during HOMER annotatePeaks.pl run upstream
-    for peak_header_counter in range(len(peak_header)):
-        if 'Distance From' in peak_header[peak_header_counter]:
-            peak_df['Number of Motifs'] = peak_df.iloc[:, peak_header_counter] # Rename the column into something that makes more sense
-            motif_number_column_exist = 1
-            break
+        # Calculate the normalization factor for the ChIP sample read depths
+        chip_normalization_factor_value = chip_uniquely_mapped_read_count / ctrl_uniquely_mapped_read_count
+        ctrl_normalization_factor_value = 1
     
-    if motif_number_column_exist == 0:
-        peak_df['Number of Motifs'] = 0 # If the column does not exist, then the resulting output values will be all zeroes.
 
 
-    # Determining all the columns wanted in the output table, and their orders
-    peak_df = peak_df[['Peak ID', 
-                        'Chr', 
-                        'Start', 
-                        'End', 
-                        'Strand', 
-                        'Peak Caller Combination', 
-                        'Peak Caller Overlaps'
-                        ] + calculator_output_column_name + [
-                        'Number of Motifs', 
-                        'Annotation', 
-                        'Detailed Annotation', 
-                        'Distance to TSS', 
-                        'Nearest PromoterID', 
-                        'Entrez ID', 
-                        'Nearest Unigene', 
-                        'Nearest Refseq', 
-                        'Nearest Ensembl', 
-                        'Gene Name', 
-                        'Gene Alias', 
-                        'Gene Description', 
-                        'Gene Type', 
-                        'CpG%', 
-                        'GC%'
-                        ]]
+    if args.normfactor == 'user_value':
+        # Get the ChIP normalization factor directly from the user inputted argument
+        chip_norm_factor = args.chip_norm
+        # Get the control normalization factor directly from the user inputted argument
+        ctrl_norm_factor = args.ctrl_norm
 
-    # Fix the bug where pandas automatically adds one decimal point to all the numbers in the 'Entrez ID' column
-    # Some entries in the 'Entrez ID' column are NaN. When pandas parse column containing numbers 
-    #   with one or more NaNs, it automatically assigns all values into float type
-    peak_df['Entrez ID'] = peak_df['Entrez ID'].fillna(0).astype('Int64')
+        chip_normalization_factor_value = chip_norm_factor[chip_replicate_counter]
+        ctrl_normalization_factor_value = ctrl_norm_factor[chip_replicate_counter]
 
-    print('Writing the result to file {}'.format(output_tsv_full_path))
-    # HOMER annotated peak list augmented with essential information regarding the 
-    #   'quality' of each peak (fold change, read depth, motif count)
-    peak_df.to_csv(output_tsv_full_path, sep = '\t', index = False)
+    print('chip_normalization_factor_value:', chip_normalization_factor_value)
+    print('ctrl_normalization_factor_value:', ctrl_normalization_factor_value)
+
+    # Getting the folder ready for the temporary samtools depth files generated in fold_change_calculator_function
+    subprocess.run('mkdir -p temp_{}'.format(chip_bam_name[chip_replicate_counter]), shell = True)
+
+
+
+    pool_calculator = multiprocessing.Pool(processes = cpu_count)
+    
+    # Takes in a list of each peak's chromosomal location codes (chr:start-end)
+    # Reads the current_chip_bam and current_ctrl_bam assigned above at those locations
+    # Returns ChIP read depth, control read depth, and fold change value at the weighted peak center of each peak
+    # Only for transcription factor target protein sample (narrow peaks)
+    if peak_type == 'narrow':
+        chip_tag_count_list, ctrl_tag_count_list, fold_change_list, peak_center_list = zip(*pool_calculator.map(fold_change_calculator_function_narrow, peak_df['Peak ID']))
+    
+
+    # Takes in a list of each peak's chromosomal location codes (chr:start-end)
+    # Reads the current_chip_bam and current_ctrl_bam assigned above at those locations
+    # Returns ChIP read count, control read count, and average fold change value along the whole range of each peak
+    # Only for histone modifier target protein sample (broad peaks)
+    if peak_type == 'broad':
+        chip_tag_count_list, ctrl_tag_count_list, fold_change_list = zip(*pool_calculator.map(fold_change_calculator_function_broad, peak_df['Peak ID']))
+        peak_center_df = (0.5 * (peak_df['Start'] + peak_df['End'])).round(0)
+        peak_center_list = peak_center_df.values.tolist()
+
+    pool_calculator.close()
+    pool_calculator.join()
+
+    # Remove the samtools depth output temporary folder
+    subprocess.run('rm -rf temp_{}'.format(chip_bam_name[chip_replicate_counter]), shell = True)
+
+
+
+    if len(chip_bam_absolute_path) == 1 and len(ctrl_bam_absolute_path) == 1:
+        # Save the final fold_change_calculator_function outputs in their appropriate pandas columns
+        peak_df['ChIP Tag Count']       = chip_tag_count_list
+        peak_df['Control Tag Count']    = ctrl_tag_count_list
+        peak_df['Fold Change']          = fold_change_list
+        peak_df['Peak Center']          = peak_center_list
+
+    if len(chip_bam_absolute_path) > 1 and len(ctrl_bam_absolute_path) > 1:
+        # Save the current fold_change_calculator_function outputs in their 
+        #   appropriate pandas columns before going for another iteration
+        peak_df['ChIP Tag Count Rep {}'.format(chip_replicate_counter + 1)]     = chip_tag_count_list
+        peak_df['Control Tag Count Rep {}'.format(chip_replicate_counter + 1)]  = ctrl_tag_count_list
+        peak_df['Fold Change Rep {}'.format(chip_replicate_counter + 1)]        = fold_change_list
+        peak_df['Peak Center Rep {}'.format(chip_replicate_counter + 1)]        = peak_center_list
+
+
+
+motif_number_column_exist = 0
+
+# Parsing for the existence of number of motifs column. The column might be absent if 
+#   -motif flag was not used during HOMER annotatePeaks.pl run upstream
+for peak_header_counter in range(len(peak_header)):
+    if 'Distance From' in peak_header[peak_header_counter]:
+        peak_df['Number of Motifs'] = peak_df.iloc[:, peak_header_counter] # Rename the column into something that makes more sense
+        motif_number_column_exist = 1
+        break
+
+if motif_number_column_exist == 0:
+    peak_df['Number of Motifs'] = 0 # If the column does not exist, then the resulting output values will be all zeroes.
+
+
+
+# Determining all the columns wanted in the output table, and their orders
+peak_df = peak_df[['Peak ID', 
+                    'Chr', 
+                    'Start', 
+                    'End', 
+                    'Strand', 
+                    'Peak Caller Combination', 
+                    'Peak Caller Overlaps'
+                    ] + calculator_output_column_name + [
+                    'Number of Motifs', 
+                    'Annotation', 
+                    'Detailed Annotation', 
+                    'Distance to TSS', 
+                    'Nearest PromoterID', 
+                    'Entrez ID', 
+                    'Nearest Unigene', 
+                    'Nearest Refseq', 
+                    'Nearest Ensembl', 
+                    'Gene Name', 
+                    'Gene Alias', 
+                    'Gene Description', 
+                    'Gene Type', 
+                    'CpG%', 
+                    'GC%'
+                    ]]
+
+# Fix the bug where pandas automatically adds one decimal point to all the numbers in the 'Entrez ID' column
+# Some entries in the 'Entrez ID' column are NaN. When pandas parse column containing numbers 
+#   with one or more NaNs, it automatically assigns all values into float type
+peak_df['Entrez ID'] = peak_df['Entrez ID'].fillna(0).astype('Int64')
+
+print('Writing the result to file {}'.format(output_tsv_full_path))
+# HOMER annotated peak list augmented with essential information regarding the 
+#   'quality' of each peak (fold change, read depth, motif count)
+peak_df.to_csv(output_tsv_full_path, sep = '\t', index = False)
+
+
+
+# Creating "pseudo"-columns required to convert the fold change calculated peak list into .narrowPeak or .broadPeak
+# Necessary so that the fold change calculated peak list (union peak set) can be processed by the IDR module
+peak_df['score'] = 0 # Creating a new column "score" in peak_df, which values are all 0
+peak_df['p-value'] = -1 # Creating a new column "p-value" in peak_df, which values are all -1
+peak_df['q-value'] = -1 # Creating a new column "q-value" in peak_df, which values are all -1
+peak_df['peak'] = -1 # Creating a new column "peak" in peak_df, which values are all -1 (only needed for .narrowPeak)
+
+if len(chip_bam_absolute_path) == 1 and len(ctrl_bam_absolute_path) == 1: # If there are only a single "Fold Change" column in the fold change calculated peak list
+    # Creating a new column "signalValue" in peak_df, which values are obtained from the "Fold Change" column values
+    peak_df['signalValue'] = peak_df[['Fold Change']]
+
+if len(chip_bam_absolute_path) > 1 and len(ctrl_bam_absolute_path) > 1: # If there are multi-replicated "Fold Change" columns in the fold change calculated peak list
+    # Creating a new column "signalValue" in peak_df, which values are obtained from the average of "Fold Change" columns values
+    peak_df['signalValue'] = peak_df[['Fold Change Rep {}'.format(chip_replicate_counter + 1) for chip_replicate_counter in range(len(chip_bam_absolute_path))]].mean(axis = 1)
+
+# Prepare the peak_df to be a proper input for IDR module processing: ranking the peaks according to the number of peak caller overlaps and signalValue (fold change)
+peak_df.sort_values(by = ['Peak Caller Overlaps', 'signalValue'], inplace = True, ascending = False)
+
+
+
+# Make a .narrowPeak formatted peak list by getting all the necessary columns from the peak_df
+if peak_type == 'narrow':
+    narrowpeak_df = peak_df[['Chr',
+                            'Start',
+                            'End',
+                            'Peak ID',
+                            'score',
+                            'Strand',
+                            'signalValue',
+                            'p-value',
+                            'q-value',
+                            'peak'
+                            ]]
+
+    # Save the .narrowPeak formatted peak list (the union peak set for IDR input) under .narrowPeak extension
+    output_tsv_extension = '.' + output_tsv_full_path.split('.')[-1] if len(output_tsv_full_path.split('.')) > 1 else ''
+    output_narrowpeak_full_path = output_tsv_full_path.strip(output_tsv_extension) + '.narrowPeak'
+    print('Writing narrowPeak-formatted output for IDR calculation {}'.format(output_narrowpeak_full_path))
+    narrowpeak_df.to_csv(output_narrowpeak_full_path, sep = '\t', index = False, header = None)
+
+
+
+# Make a .broadPeak formatted peak list by getting all the necessary columns from the peak_df
+if peak_type == 'broad':
+    broadpeak_df = peak_df[['Chr',
+                            'Start',
+                            'End',
+                            'Peak ID',
+                            'score',
+                            'Strand',
+                            'signalValue',
+                            'p-value',
+                            'q-value'
+                            ]]
+
+    # Save the .broadPeak formatted peak list (the union peak set for IDR input) under .broadPeak extension
+    output_tsv_extension = '.' + output_tsv_full_path.split('.')[-1] if len(output_tsv_full_path.split('.')) > 1 else ''
+    output_broadpeak_full_path = output_tsv_full_path.strip(output_tsv_extension) + '.broadPeak'
+    print('Writing broadPeak-formatted output for IDR calculation {}'.format(output_broadpeak_full_path))
+    broadpeak_df.to_csv(output_broadpeak_full_path, sep = '\t', index = False, header = None)

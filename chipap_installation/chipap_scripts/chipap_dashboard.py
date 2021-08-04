@@ -2,7 +2,7 @@
 #pyright: reportUnboundVariable=false
 
 
-# script_version = '2.0'
+script_version = '2.0'
 
 
 import tkinter as tk

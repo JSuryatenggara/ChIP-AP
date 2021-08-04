@@ -2,7 +2,7 @@
 #pyright: reportUnboundVariable=false
 
 
-# script_version = '5.0'
+script_version = '5.1'
 
 
 # A fully automated ChIP-seq pipeline, processes raw sequencing reads (or aligned reads),
@@ -115,7 +115,7 @@
 #   Version 4.2     Peak type "unsure" is now available as an optional argument for the --peak flag.
 #                       When peak type is "unsure", ChIP-AP will run twice, sequentially, not altogether.
 #                       First run with narrow peak type settings. Second run with broad peak type settings.
-#                       First run will be stored in folder [setname]_narrow, and second run folder [setname]_broad
+#                       First run will be stored in folder dataset_name_narrow, and second run folder dataset_name_broad
 #                       The same settings table will be used for both runs. Default settings table is recommended.
 #
 #   Version 5.0     Motif enrichment analysis by HOMER and MEME are now intergrated into ChIP-AP pipeline
@@ -129,7 +129,7 @@
 #                               Will be performed when user includes --meme_motif [consensus/union/both] flag argument in ChIP-AP command line
 #                               The results will stored in a new folder 25_meme_motif_enrichment
 #                       fold_change_calculator_suite_3.0.py replaces the older fold_change_calculator_suite_2.1.py
-#                           Now adds each replicate's peak center coordinate into the resulting file: setname_all_peaks_calculated.tsv
+#                           Now adds each replicate's peak center coordinate into the resulting file: dataset_name_all_peaks_calculated.tsv
 #                           Weighted peak center coordinate for narrow peak type, and simply peak mid-point coordinate for broad peak type
 #                           Weighted peak center coordinate value is needed for the new script meme_sequence_extractor_5.0.py
 #                       A home-made script meme_sequence_extractor_5.0.py is added into the pipeline
@@ -160,10 +160,19 @@
 #                       File default_settings_table has been renamed to default_settings_table.tsv to better reflect its table format
 #                       Software update check implemented at the beginning of pipeline.
 #                           Informing users of newer version of ChIP-AP script(s) available for download on GitHub.
+#
+#   Version 5.1     Peak reproducibility (IDR) calculations are now intergrated into ChIP-AP pipeline
+#                       IDR module is now a part of ChIP-AP.
+#                           Calculates IDR value of each peak in the full peak list dataset_name_all_peaks_calculated.tsv
+#                               By pair-wise processing the full peak list (union peak set) against individual peak callers sets
+#                           Adds the IDR value into the full peak list and save it under the same file name (modifies dataset_name_all_peaks_calculated.tsv)
+#                       New home-made script IDR_integrator.py is used to integrate IDR values obtained from IDR module results above
+#                   Reads aligned chr_alt, chr_fix, chrN_random, chrUn, and chrM in externally aligned .bam files are now properly filtered out
+#                       Only relevant when sample inputs are .bam files instead of .fastq
+
+
 
 # Import required modules
-print('Importing required modules')
-
 from os.path import dirname as up
 import argparse
 import os
@@ -178,7 +187,6 @@ import requests
 import pathlib
 
 
-print('Defining functions')
 
 # Function to parse the absolute path, basename, and extension of the assigned argument: 
 
@@ -273,8 +281,6 @@ def check_program(program_name):
 
 
 # Set arguments to be parsed when the script is called
-print('Setting argument parser')
-
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--mode', 
@@ -364,6 +370,8 @@ parser.add_argument('--run',
                     help = '<Optional> Use to immediately run the suite by running the master script. When not used, the generated bash master script (MASTER_script.sh) in the output folder can be run manually by user', 
                     action = 'store_true')
 
+parser.add_argument('--version', action = 'version', version = 'ChIP-AP Version {}'.format(script_version))
+
 args = parser.parse_args()
 
 
@@ -372,8 +380,9 @@ args = parser.parse_args()
 ### PARSED FLAG ARGUMENTS VARIABLE ASSIGNMENT
 ########################################################################################################################
 
+print('\n-------------------\nChIP-AP Version {}\n-------------------\n'.format(script_version))
+
 # Assign parsed arguments into variables
-print('Parsing arguments')
 chipap_program_name = 'chipap.py'
 
 dataset_name = args.setname # Resulting files will be named based in this
@@ -413,13 +422,15 @@ root_dir = os.path.expanduser('/') # Absolute path to the root directory
 cpu_count = args.thread
 
 # Getting the directory on which the script was called
-current_dir = os.getcwd()
+current_dir = str(pathlib.Path(__file__).parent.absolute())
 
 
 
 ########################################################################################################################
 ### SOFTWARE UPDATE CHECK
 ########################################################################################################################
+
+print('Checking for updates on GitHub\n')
 
 remote_directory = 'https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/chipap_installation'
 
@@ -432,15 +443,12 @@ program_update_check_list = ['chipap_scripts/chipap.py',
                             'chipap_scripts/chipap_wizard.py',
                             'chipap_scripts/Genrich.py',
                             'chipap_scripts/fold_change_calculator.py',
+                            'chipap_scripts/IDR_integrator.py',
                             'chipap_scripts/GO_annotator.py',
                             'chipap_scripts/pathway_annotator.py',
                             'chipap_scripts/peak_caller_stats_calculator.py',
                             'chipap_scripts/meme_sequence_extractor.py',
-                            'chipap_scripts/default_settings_table.tsv',
-                            'chipap_env_linux.yml',
-                            'chipap_env_macos.yml',
-                            'chipap_installer.py',
-                            'homer_genome_update.sh']
+                            'chipap_scripts/default_settings_table.tsv']
 
 
 update_counter = 0
@@ -471,11 +479,11 @@ for program in program_update_check_list:
 
 
 if update_counter == 0:
-    print('Your ChIP-AP is up to date')
+    print('\nYour ChIP-AP is up to date\n')
 
 if update_counter > 0:
-    print('{} updates available on our GitHub (https://github.com/JSuryatenggara/ChIP-AP)'.format(update_counter))
-    print('Update all at once by downloading our latest release (https://github.com/JSuryatenggara/ChIP-AP/releases)')
+    print('\n{} updates available on our GitHub (https://github.com/JSuryatenggara/ChIP-AP)'.format(update_counter))
+    print('Update all at once by downloading our latest release (https://github.com/JSuryatenggara/ChIP-AP/releases)\n')
 
 
 
@@ -1072,10 +1080,10 @@ if peak_type == 'unsure':
                                                                                     cpu_count_arg,
                                                                                     run_arg)
 
-    # Run the narrow peak pipeline first (results stored under the folder [setname]_narrow)
+    # Run the narrow peak pipeline first (results stored under the folder dataset_name_narrow)
     subprocess.run(narrow_command_line_string, shell = True)
 
-    # Then follow up by running the broad peak pipeline (results stored under the folder [setname]_broad)
+    # Then follow up by running the broad peak pipeline (results stored under the folder dataset_name_broad)
     subprocess.run(broad_command_line_string, shell = True)
 
     exit()
@@ -1237,6 +1245,22 @@ if check_program('fold_change_calculator.py') is False:
     print('Pre-run test of fold_change_calculator.py failed. Please try running fold_change_calculator.py individually to check for the problem')
     error_status = 1
 
+if which('idr') is None:
+    print('Please make sure IDR is installed, in PATH, and marked as executable')
+    error_status = 1 
+
+if check_program('idr') is False:
+    print('Pre-run test of IDR failed. Please try running IDR individually to check for the problem')
+    error_status = 1
+
+if which('IDR_integrator.py') is None:
+    print('Please make sure IDR_integrator.py is installed, in PATH, and marked as executable')
+    error_status = 1 
+
+if check_program('IDR_integrator.py') is False:
+    print('Pre-run test of IDR_integrator.py failed. Please try running IDR_integrator.py individually to check for the problem')
+    error_status = 1
+
 if which('peak_caller_stats_calculator.py') is None:
     print('Please make sure peak_caller_stats_calculator.py is installed, in PATH, and marked as executable')
     error_status = 1 
@@ -1328,8 +1352,6 @@ if error_status == 1:
 # The -x option causes bash to print each command before executing it. For debugging. Will remove from the finished product.
 
 # Creating output directory folder
-print('Creating output directory folder')
-
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
@@ -2843,7 +2865,7 @@ aligned_reads_quality_control_script.close() # Closing the script '09_aligned_re
 # Various output will be generated. The peak list file that is going to be used 
 #   in subsequent analysis is the one in narrowPeak format, .narrowPeak extension
 # In: filename.bam (output from 08_results_script.sh)
-# Out: setname_MACS2_peaks.narrowPeak
+# Out: dataset_name_MACS2_peaks.narrowPeak
 
 macs2_dir = '{}/11_macs2_peak_calling'.format(output_dir)
 macs2_peak_calling_script_name = '{}/11_macs2_peak_calling_script.sh'.format(macs2_dir)
@@ -2952,7 +2974,7 @@ if peak_type == 'narrow':
     # Various output will be generated. The peak list file that is going to be used 
     #   in subsequent analysis is the one named GEM_events
     # In: filename.bam (output from 08_results_script.sh)
-    # Out: setname_GEM_GEM_events.txt (input for 21_peaks_merging_script.sh)
+    # Out: dataset_name_GEM_GEM_events.txt (input for 21_peaks_merging_script.sh)
 
     gem_dir = '{}/12_gem_peak_calling'.format(output_dir)
     gem_peak_calling_script_name = '{}/12_gem_peak_calling_script.sh'.format(gem_dir)
@@ -3074,7 +3096,7 @@ if peak_type == 'broad':
 # Various output will be generated. The peak list file that is going to be used 
 #   in subsequent analysis is the one in HOMER format, with user-determined filename and extension
 # In: filename.bam (output from 08_results_script.sh)
-# Out: setname_HOMER.peaks (input for 21_peaks_merging_script.sh)
+# Out: dataset_name_HOMER.peaks (input for 21_peaks_merging_script.sh)
 
 homer_dir = '{}/13_homer_peak_calling'.format(output_dir)
 homer_peak_calling_script_name = '{}/13_homer_peak_calling_script.sh'.format(homer_dir)
@@ -3170,7 +3192,7 @@ homer_peak_calling_script.close() # Closing the script '13_homer_peak_calling_sc
 # Various output will be generated. The peak list file that is going to be used 
 #   in subsequent analysis is the one in narrowPeak format, with .narrowPeak extension
 # In: filename.namesorted.bam (output from 08_results_script.sh)
-# Out: setname_Genrich.narrowPeak (input for 21_peaks_merging_script.sh)
+# Out: dataset_name_Genrich.narrowPeak (input for 21_peaks_merging_script.sh)
 
 
 
@@ -3234,11 +3256,11 @@ genrich_peak_calling_script.close() # Closing the script '14_genrich_peak_callin
 #   reformating them into "HOMER custom_setting_table" with awk, and save them in this folder
 # The script also calls for HOMER peak merging program: HOMER mergePeaks, that combines all the peak lists together, 
 #   merging peaks within 100 bp vicinity (default settings; customizable) into one single peak 
-# In: setname_MACS2_peaks.narrowPeak (output from 11_macs2_peak_calling_script.sh)
-# In: setname_GEM_GEM_events.txt (output from 12_gem_peak_calling_script.sh)
-# In: setname_HOMER.peaks (output from 13_homer_peak_calling_script.sh)
-# In: setname_Genrich.narrowPeak (output from 14_genrich_peak_calling_script.sh)
-# Out: setname_merged_peaks* (multiple files) (input for 22_peaks_processing_script.sh)
+# In: dataset_name_MACS2_peaks.narrowPeak (output from 11_macs2_peak_calling_script.sh)
+# In: dataset_name_GEM_GEM_events.txt (output from 12_gem_peak_calling_script.sh)
+# In: dataset_name_HOMER.peaks (output from 13_homer_peak_calling_script.sh)
+# In: dataset_name_Genrich.narrowPeak (output from 14_genrich_peak_calling_script.sh)
+# Out: dataset_name_merged_peaks* (multiple files) (input for 22_peaks_processing_script.sh)
 
 peaks_merging_dir = '{}/21_peaks_merging'.format(output_dir)
 peaks_merging_script_name = '{}/21_peaks_merging_script.sh'.format(peaks_merging_dir)
@@ -3248,6 +3270,13 @@ peaks_merging_script = open(peaks_merging_script_name, 'w')
 
 peaks_merging_script.write('#!/bin/bash\n\n')
 peaks_merging_script.write('set -euxo pipefail\n\n')
+
+
+
+chromosomes_df = pd.read_csv('{}/chrom.sizes/{}.chrom.sizes'.format(genome_dir, genome_ref), header = None, usecols = [0], sep = '\t')
+chromosomes_df.sort_values(by = [0], inplace = True)
+chromosomes_list = chromosomes_df[0].values.tolist()
+chromosomes_string = '\|'.join(chromosomes_list)
 
 
 
@@ -3261,6 +3290,7 @@ if peak_type == 'narrow':
     peaks_merging_script.write(' | head -200000') # Take the 100,000 peaks with highest signalValue. Anomalies happen sometimes where a peak caller calls 1,000,000+ peaks.
     peaks_merging_script.write(r""" | awk '{OFS="\t";print $1,$2,$3}'""") # Get only the chr column ($1), start column ($2), and end column ($3)
     peaks_merging_script.write(r""" | awk '{OFS="\t";print $1":"$2"-"$3,$1,$2,$3,"+"}'""") # Make it into HOMER format (chr:start-end \t chr \t start \t end \t strand)
+    peaks_merging_script.write(" | grep -w '{}'".format(chromosomes_string)) # Filter out chr_alt, chr_fix, chrN_random, chrUn, and chrM
     peaks_merging_script.write(' > {}/MACS2'.format(peaks_merging_dir)) # Save it under a short name (as to not generate mergePeaks output filename too long)
     peaks_merging_script.write(' &\n\n')
 
@@ -3272,6 +3302,7 @@ if peak_type == 'narrow':
     peaks_merging_script.write(' | head -200000') # Take the 100,000 peaks with highest fold change. Anomalies happen sometimes where a peak caller calls 1,000,000+ peaks.
     peaks_merging_script.write(r""" | awk '{split($1,a,":"); OFS="\t"; print "chr"a[1],a[2]-25,a[2]+25}'""") # Get the 1 bp coordinate generated by GEM. Extend it left and right to 50 bp.
     peaks_merging_script.write(r""" | awk '{OFS="\t";print $1":"$2"-"$3,$1,$2,$3,"+"}'""") # Make it into HOMER format (chr:start-end \t chr \t start \t end \t strand)
+    peaks_merging_script.write(" | grep -w '{}'".format(chromosomes_string)) # Filter out chr_alt, chr_fix, chrN_random, chrUn, and chrM
     peaks_merging_script.write(' > {}/GEM'.format(peaks_merging_dir)) # Save it under a short name (as to not generate mergePeaks output filename too long)
     peaks_merging_script.write(' &\n\n')
 
@@ -3283,6 +3314,7 @@ if peak_type == 'narrow':
     peaks_merging_script.write(' | head -200000') # Take the 100,000 peaks with highest fold change. Anomalies happen sometimes where a peak caller calls 1,000,000+ peaks.
     peaks_merging_script.write(r""" | awk '{OFS="\t";print $2,$3,$4}'""") # Get only the chr column ($2), start column ($3), and end column ($4)
     peaks_merging_script.write(r""" | awk '{OFS="\t";print $1":"$2"-"$3,$1,$2,$3,"+"}'""") # Make it into HOMER format (chr:start-end \t chr \t start \t end \t strand)
+    peaks_merging_script.write(" | grep -w '{}'".format(chromosomes_string)) # Filter out chr_alt, chr_fix, chrN_random, chrUn, and chrM
     peaks_merging_script.write(' > {}/HOMER'.format(peaks_merging_dir)) # Save it under a short name (as to not generate mergePeaks output filename too long)
     peaks_merging_script.write(' &\n\n')
 
@@ -3293,6 +3325,7 @@ if peak_type == 'narrow':
     peaks_merging_script.write(' | head -200000') # Take the 100,000 peaks with highest signalValue. Anomalies happen sometimes where a peak caller calls 1,000,000+ peaks.
     peaks_merging_script.write(r""" | awk '{OFS="\t";print $1,$2,$3}'""") # Get only the chr column ($1), start column ($2), and end column ($3)
     peaks_merging_script.write(r""" | awk '{OFS="\t";print $1":"$2"-"$3,$1,$2,$3,"+"}'""") # Make it into HOMER format (chr:start-end \t chr \t start \t end \t strand)
+    peaks_merging_script.write(" | grep -w '{}'".format(chromosomes_string)) # Filter out chr_alt, chr_fix, chrN_random, chrUn, and chrM
     peaks_merging_script.write(' > {}/Genrich'.format(peaks_merging_dir)) # Save it under a short name (as to not generate mergePeaks output filename too long)
     peaks_merging_script.write(' &\n\n')
 
@@ -3320,6 +3353,7 @@ if peak_type == 'broad':
     peaks_merging_script.write(' | head -200000') # Take the 100,000 peaks with highest signalValue. Anomalies happen sometimes where a peak caller calls 1,000,000+ peaks.
     peaks_merging_script.write(r""" | awk '{OFS="\t";print $1,$2,$3}'""") # Get only the chr column ($1), start column ($2), and end column ($3)
     peaks_merging_script.write(r""" | awk '{OFS="\t";print $1":"$2"-"$3,$1,$2,$3,"+"}'""") # Make it into HOMER format (chr:start-end \t chr \t start \t end \t strand)
+    peaks_merging_script.write(" | grep -w '{}'".format(chromosomes_string)) # Filter out chr_alt, chr_fix, chrN_random, chrUn, and chrM
     peaks_merging_script.write(' > {}/MACS2'.format(peaks_merging_dir)) # Save it under a short name (as to not generate mergePeaks output filename too long)
     peaks_merging_script.write(' &\n\n')
 
@@ -3330,6 +3364,7 @@ if peak_type == 'broad':
     peaks_merging_script.write(' | head -200000') # Take the 100,000 peaks with highest fold change. Anomalies happen sometimes where a peak caller calls 1,000,000+ peaks.
     peaks_merging_script.write(r""" | awk '{OFS="\t";print $1,$2,$3}'""") # Get only the chr column ($1), start column ($2), and end column ($3)
     peaks_merging_script.write(r""" | awk '{OFS="\t";print $1":"$2"-"$3,$1,$2,$3,"+"}'""") # Make it into HOMER format (chr:start-end \t chr \t start \t end \t strand)
+    peaks_merging_script.write(" | grep -w '{}'".format(chromosomes_string)) # Filter out chr_alt, chr_fix, chrN_random, chrUn, and chrM
     peaks_merging_script.write(' > {}/SICER2'.format(peaks_merging_dir)) # Save it under a short name (as to not generate mergePeaks output filename too long)
     peaks_merging_script.write(' &\n\n')
 
@@ -3341,6 +3376,7 @@ if peak_type == 'broad':
     peaks_merging_script.write(' | head -200000') # Take the 100,000 peaks with highest fold change. Anomalies happen sometimes where a peak caller calls 1,000,000+ peaks.
     peaks_merging_script.write(r""" | awk '{OFS="\t";print $2,$3,$4}'""") # Get only the chr column ($2), start column ($3), and end column ($4)
     peaks_merging_script.write(r""" | awk '{OFS="\t";print $1":"$2"-"$3,$1,$2,$3,"+"}'""") # Make it into HOMER format (chr:start-end \t chr \t start \t end \t strand)
+    peaks_merging_script.write(" | grep -w '{}'".format(chromosomes_string)) # Filter out chr_alt, chr_fix, chrN_random, chrUn, and chrM
     peaks_merging_script.write(' > {}/HOMER'.format(peaks_merging_dir)) # Save it under a short name (as to not generate mergePeaks output filename too long)
     peaks_merging_script.write(' &\n\n')
 
@@ -3351,6 +3387,7 @@ if peak_type == 'broad':
     peaks_merging_script.write(' | head -200000') # Take the 100,000 peaks with highest signalValue. Anomalies happen sometimes where a peak caller calls 1,000,000+ peaks.
     peaks_merging_script.write(r""" | awk '{OFS="\t";print $1,$2,$3}'""") # Get only the chr column ($1), start column ($2), and end column ($3)
     peaks_merging_script.write(r""" | awk '{OFS="\t";print $1":"$2"-"$3,$1,$2,$3,"+"}'""") # Make it into HOMER format (chr:start-end \t chr \t start \t end \t strand)
+    peaks_merging_script.write(" | grep -w '{}'".format(chromosomes_string)) # Filter out chr_alt, chr_fix, chrN_random, chrUn, and chrM
     peaks_merging_script.write(' > {}/Genrich'.format(peaks_merging_dir)) # Save it under a short name (as to not generate mergePeaks output filename too long)
     peaks_merging_script.write(' &\n\n')
 
@@ -3385,14 +3422,14 @@ peaks_merging_script.close() # Closing the script '21_peaks_merging_script.sh'. 
 #   in .tsv format that can be easily viewed, sorted, and filtered in spreadsheet applications.
 # The script will also generate a separate summary custom_setting_table file that shows 
 #   the statistics of peaks that are called each combination of peak callers.
-# In: setname_merged_peaks* (multiple files) (output from 21_peaks_merging_script.sh)
-# Out: setname_all_peaks_calculated.tsv (input for 23_go_annotation_script.sh or 
+# In: dataset_name_merged_peaks* (multiple files) (output from 21_peaks_merging_script.sh)
+# Out: dataset_name_all_peaks_calculated.tsv (input for 23_go_annotation_script.sh or 
 #   23_pathway_annotation_script.sh or 23_go_pathway_annotation_script.sh)
 
 peaks_processing_dir = '{}/22_peaks_processing'.format(output_dir)
 peaks_processing_script_name = '{}/22_peaks_processing_script.sh'.format(peaks_processing_dir)
-if not os.path.exists(peaks_processing_dir):
-    os.makedirs(peaks_processing_dir)
+if not os.path.exists(peaks_processing_dir + '/IDR_files'):
+    os.makedirs(peaks_processing_dir + '/IDR_files')
 peaks_processing_script = open(peaks_processing_script_name, 'w')
 
 peaks_processing_script.write('#!/bin/bash\n\n')
@@ -3431,9 +3468,10 @@ if force_merge == 0:
 
     # Bash commands to call the home-made script fold_change_calculator.py 
     #   to append tag counts, fold changes, motif hits, and peak caller overlaps stats to each peak
-    peaks_processing_script.write('fold_change_calculator.py {} --thread {} --input_tsv {}/{}_all_peaks_annotated.tsv --output_tsv {}/{}_all_peaks_calculated.tsv --chip_bam {} --ctrl_bam {}\n\n'.format(
+    peaks_processing_script.write('fold_change_calculator.py {} --thread {} --peak {} --input_tsv {}/{}_all_peaks_annotated.tsv --output_tsv {}/{}_all_peaks_calculated.tsv --chip_bam {} --ctrl_bam {}\n\n'.format(
         fold_change_calculator_arg,
         cpu_count, 
+        peak_type,
         peaks_processing_dir, 
         dataset_name, 
         peaks_processing_dir, 
@@ -3459,6 +3497,183 @@ if force_merge == 1:
         results_dir, 
         dataset_name))
 
+
+
+# Commands to extract peak locations and "magnitudes" from peak caller output of MACS2 (narrow peak mode), GEM, HOMER (factor peak mode), and Genrich
+# Only when ChIP-AP is running in narrow peak mode (ChIP protein is a transcription factor)
+if peak_type == 'narrow':
+    # Bash commands to reformat MACS2 peak list file (.narrowPeak) into a ranked list for IDR calculation
+    peaks_processing_script.write('cat {}/{}_MACS2_peaks.narrowPeak'.format(macs2_dir, dataset_name)) # Read called peaks list by MACS2
+    peaks_processing_script.write(' | sort -k 7 -n -r') # Run reversed (-r) numerical (-n) sort by the signalValue (column 7), causing the list to start with highest scoring peaks
+    peaks_processing_script.write(' | head -100000') # Take the 100,000 peaks with highest signalValue. Anomalies happen sometimes where a peak caller calls 1,000,000+ peaks.
+    peaks_processing_script.write(r""" | awk '{OFS="\t";print $1,$2,$3,$7}'""") # Get only the chr column ($1), start column ($2), end column ($3), and signalValue column ($7)
+    peaks_processing_script.write(r""" | awk '{OFS="\t";print $1,$2,$3,$1":"$2"-"$3,"0",".",$4,"-1","-1","-1"}'""") # Make it into narrowPeak format
+    peaks_processing_script.write(' > {}/IDR_files/MACS2_IDR_input.narrowPeak'.format(peaks_processing_dir)) # Save it as MACS2_IDR_input.narrowPeak
+    peaks_processing_script.write(' &\n\n')
+
+    # Bash commands to reformat GEM peak list file (GEM_events.txt) into a ranked list for IDR calculation
+    peaks_processing_script.write('cat {}/{}_GEM*GEM_events.txt'.format(gem_dir, dataset_name))
+    peaks_processing_script.write(' | tail -n +2') # Throw out the headers
+    peaks_processing_script.write(' | sort -k 4 -n -r') # Run reversed (-r) numerical (-n) sort by the fold change (column 4), causing the list to start with peaks with highest fold change
+    peaks_processing_script.write(' | head -100000') # Take the 100,000 peaks with highest fold change. Anomalies happen sometimes where a peak caller calls 1,000,000+ peaks.
+    peaks_processing_script.write(r""" | awk '{split($1,a,":"); OFS="\t"; print "chr"a[1],a[2]-25,a[2]+25,$4}'""") # Get the 1 bp coordinate generated by GEM. Extend it L&R to 50 bp. With fold change column ($4) as the last column
+    peaks_processing_script.write(r""" | awk '{OFS="\t";print $1,$2,$3,$1":"$2"-"$3,"0",".",$4,"-1","-1","-1"}'""") # Make it into narrowPeak format
+    peaks_processing_script.write(' > {}/IDR_files/GEM_IDR_input.narrowPeak'.format(peaks_processing_dir)) # Save it as GEM_IDR_input.narrowPeak
+    peaks_processing_script.write(' &\n\n')
+
+    # Bash commands to reformat HOMER peak list file (user-determined filename) into a ranked list for IDR calculation
+    peaks_processing_script.write('cat {}/{}_HOMER.peaks'.format(homer_dir, dataset_name))
+    peaks_processing_script.write(' | tail -n +41') # Throw out the headers
+    peaks_processing_script.write(' | sort -k 11 -n -r') # Run reversed (-r) numerical (-n) sort by the fold change (column 11), thus list starts with peaks with highest fold change
+    peaks_processing_script.write(' | head -100000') # Take the 100,000 peaks with highest fold change. Anomalies happen sometimes where a peak caller calls 1,000,000+ peaks.
+    peaks_processing_script.write(r""" | awk '{OFS="\t";print $2,$3,$4,$11}'""") # Get only the chr column ($2), start column ($3), end column ($4), and fold change column ($11)
+    peaks_processing_script.write(r""" | awk '{OFS="\t";print $1,$2,$3,$1":"$2"-"$3,"0",".",$4,"-1","-1","-1"}'""") # Make it into narrowPeak format
+    peaks_processing_script.write(' > {}/IDR_files/HOMER_IDR_input.narrowPeak'.format(peaks_processing_dir)) # Save it as HOMER_IDR_input.narrowPeak
+    peaks_processing_script.write(' &\n\n')
+
+    # Bash commands to reformat Genrich peak list file (.narrowPeak) into a ranked list for IDR calculation
+    peaks_processing_script.write('cat {}/{}_Genrich.narrowPeak'.format(genrich_dir, dataset_name))
+    peaks_processing_script.write(' | sort -k 7 -n -r') # Run reversed (-r) numerical (-n) sort by the signalValue (column 7), causing the list to start with highest scoring peaks
+    peaks_processing_script.write(' | head -100000') # Take the 100,000 peaks with highest signalValue. Anomalies happen sometimes where a peak caller calls 1,000,000+ peaks.
+    peaks_processing_script.write(r""" | awk '{OFS="\t";print $1,$2,$3,$7}'""") # Get only the chr column ($1), start column ($2), end column ($3), and signalValue column ($7)
+    peaks_processing_script.write(r""" | awk '{OFS="\t";print $1,$2,$3,$1":"$2"-"$3,"0",".",$4,"-1","-1","-1"}'""") # Make it into narrowPeak format
+    peaks_processing_script.write(' > {}/IDR_files/Genrich_IDR_input.narrowPeak'.format(peaks_processing_dir)) # Save it as Genrich_IDR_input.narrowPeak
+    peaks_processing_script.write(' &\n\n')
+
+    peaks_processing_script.write('wait\n\n')
+
+
+    # Bash command to run IDR module to calculate peak IDR based on union peak set versus MACS2 peak set
+    peaks_processing_script.write('idr -s {}/{}_all_peaks_calculated.narrowPeak {}/IDR_files/MACS2_IDR_input.narrowPeak -o {}/IDR_files/MACS2_IDR_output.tsv --input-file-type narrowPeak --rank signal.value --use-nonoverlapping-peaks &\n\n'.format(
+        peaks_processing_dir, 
+        dataset_name,
+        peaks_processing_dir,
+        peaks_processing_dir))
+
+    # Bash command to run IDR module to calculate peak IDR based on union peak set versus GEM peak set
+    peaks_processing_script.write('idr -s {}/{}_all_peaks_calculated.narrowPeak {}/IDR_files/GEM_IDR_input.narrowPeak -o {}/IDR_files/GEM_IDR_output.tsv --input-file-type narrowPeak --rank signal.value --use-nonoverlapping-peaks &\n\n'.format(
+        peaks_processing_dir, 
+        dataset_name,
+        peaks_processing_dir,
+        peaks_processing_dir))
+
+    # Bash command to run IDR module to calculate peak IDR based on union peak set versus HOMER peak set
+    peaks_processing_script.write('idr -s {}/{}_all_peaks_calculated.narrowPeak {}/IDR_files/HOMER_IDR_input.narrowPeak -o {}/IDR_files/HOMER_IDR_output.tsv --input-file-type narrowPeak --rank signal.value --use-nonoverlapping-peaks &\n\n'.format(
+        peaks_processing_dir, 
+        dataset_name,
+        peaks_processing_dir,
+        peaks_processing_dir))
+
+    # Bash command to run IDR module to calculate peak IDR based on union peak set versus Genrich peak set
+    peaks_processing_script.write('idr -s {}/{}_all_peaks_calculated.narrowPeak {}/IDR_files/Genrich_IDR_input.narrowPeak -o {}/IDR_files/Genrich_IDR_output.tsv --input-file-type narrowPeak --rank signal.value --use-nonoverlapping-peaks &\n\n'.format(
+        peaks_processing_dir, 
+        dataset_name,
+        peaks_processing_dir,
+        peaks_processing_dir))
+
+    peaks_processing_script.write('wait\n\n')
+
+
+    # Bash command to run the IDR_integrator.py to integrate the results above into the full peak list dataset_name_all_peaks_calculated.tsv
+    peaks_processing_script.write('IDR_integrator.py --input_tsv {}/{}_all_peaks_calculated.tsv --idr_tsv {}/IDR_files/MACS2_IDR_output.tsv {}/IDR_files/GEM_IDR_output.tsv {}/IDR_files/HOMER_IDR_output.tsv {}/IDR_files/Genrich_IDR_output.tsv --output_tsv {}/{}_all_peaks_calculated.tsv\n\n'.format(
+        peaks_processing_dir, 
+        dataset_name,
+        peaks_processing_dir,
+        peaks_processing_dir,
+        peaks_processing_dir,
+        peaks_processing_dir,
+        peaks_processing_dir,
+        dataset_name))    
+
+
+
+# Commands to extract peak locations and "magnitudes" from peak caller output of MACS2 (broad peak mode), SICER2, HOMER (histone peak mode), and Genrich
+# Only when ChIP-AP is running in broad peak mode (ChIP protein is a histone modifier)
+if peak_type == 'broad':
+    # Bash commands to reformat MACS2 peak list file (.broadPeak) into a ranked list for IDR calculation
+    peaks_processing_script.write('cat {}/{}_MACS2_peaks.broadPeak'.format(macs2_dir, dataset_name)) # Read called peaks list by MACS2
+    peaks_processing_script.write(' | sort -k 7 -n -r') # Run reversed (-r) numerical (-n) sort by the signalValue (column 7), causing the list to start with highest scoring peaks
+    peaks_processing_script.write(' | head -100000') # Take the 100,000 peaks with highest signalValue. Anomalies happen sometimes where a peak caller calls 1,000,000+ peaks.
+    peaks_processing_script.write(r""" | awk '{OFS="\t";print $1,$2,$3,$7}'""") # Get only the chr column ($1), start column ($2), end column ($3), and signalValue column ($7)
+    peaks_processing_script.write(r""" | awk '{OFS="\t";print $1,$2,$3,$1":"$2"-"$3,"0",".",$4,"-1","-1"}'""") # Make it into broadPeak format
+    peaks_processing_script.write(' > {}/IDR_files/MACS2_IDR_input.broadPeak'.format(peaks_processing_dir)) # Save it as MACS2_IDR_input.broadPeak
+    peaks_processing_script.write(' &\n\n')
+
+    # Bash commands to reformat SICER2 peak list file (*W*G*islands-summary) into a ranked list for IDR calculation 
+    peaks_processing_script.write('cat {}/*W*G*islands-summary'.format(sicer2_dir))
+    peaks_processing_script.write(' | sort -k 7 -n -r') # Run reversed (-r) numerical (-n) sort by the fold change (column 7), causing the list to start with peaks with highest fold change
+    peaks_processing_script.write(' | head -100000') # Take the 100,000 peaks with highest fold change. Anomalies happen sometimes where a peak caller calls 1,000,000+ peaks.
+    peaks_processing_script.write(r""" | awk '{OFS="\t";print $1,$2,$3,$7}'""") # Get only the chr column ($1), start column ($2), end column ($3), and fold change column ($7)
+    peaks_processing_script.write(r""" | awk '{OFS="\t";print $1,$2,$3,$1":"$2"-"$3,"0",".",$4,"-1","-1"}'""") # Make it into broadPeak format
+    peaks_processing_script.write(' > {}/IDR_files/SICER2_IDR_input.broadPeak'.format(peaks_processing_dir)) # Save it as GEM_IDR_input.broadPeak
+    peaks_processing_script.write(' &\n\n')
+
+    # Bash commands to reformat HOMER peak list file (user-determined filename) into a ranked list for IDR calculation
+    peaks_processing_script.write('cat {}/{}_HOMER.peaks'.format(homer_dir, dataset_name))
+    peaks_processing_script.write(' | tail -n +40') # Throw out the headers
+    peaks_processing_script.write(' | sort -k 11 -n -r') # Run reversed (-r) numerical (-n) sort by the fold change (column 11), thus list starts with peaks with highest fold change
+    peaks_processing_script.write(' | head -100000') # Take the 100,000 peaks with highest fold change. Anomalies happen sometimes where a peak caller calls 1,000,000+ peaks.
+    peaks_processing_script.write(r""" | awk '{OFS="\t";print $2,$3,$4,$11}'""") # Get only the chr column ($2), start column ($3), end column ($4), and fold change column ($11)
+    peaks_processing_script.write(r""" | awk '{OFS="\t";print $1,$2,$3,$1":"$2"-"$3,"0",".",$4,"-1","-1"}'""") # Make it into broadPeak format
+    peaks_processing_script.write(' > {}/IDR_files/HOMER_IDR_input.broadPeak'.format(peaks_processing_dir)) # Save it as HOMER_IDR_input.broadPeak
+    peaks_processing_script.write(' &\n\n')
+
+    # Bash commands to reformat Genrich peak list file (.narrowPeak) into a ranked list for IDR calculation
+    peaks_processing_script.write('cat {}/{}_Genrich.narrowPeak'.format(genrich_dir, dataset_name))
+    peaks_processing_script.write(' | sort -k 7 -n -r') # Run reversed (-r) numerical (-n) sort by the signalValue (column 7), causing the list to start with highest scoring peaks
+    peaks_processing_script.write(' | head -100000') # Take the 100,000 peaks with highest signalValue. Anomalies happen sometimes where a peak caller calls 1,000,000+ peaks.
+    peaks_processing_script.write(r""" | awk '{OFS="\t";print $1,$2,$3,$7}'""") # Get only the chr column ($1), start column ($2), end column ($3), and fold change column ($7)
+    peaks_processing_script.write(r""" | awk '{OFS="\t";print $1,$2,$3,$1":"$2"-"$3,"0",".",$4,"-1","-1"}'""") # Make it into broadPeak format
+    peaks_processing_script.write(' > {}/IDR_files/Genrich_IDR_input.broadPeak'.format(peaks_processing_dir)) # Save it as Genrich_IDR_input.broadPeak
+    peaks_processing_script.write(' &\n\n')
+
+    peaks_processing_script.write('wait\n\n')
+
+
+    # Bash command to run IDR module to calculate peak IDR based on union peak set versus MACS2 peak set
+    peaks_processing_script.write('idr -s {}/{}_all_peaks_calculated.broadPeak {}/IDR_files/MACS2_IDR_input.broadPeak -o {}/IDR_files/MACS2_IDR_output.tsv --input-file-type broadPeak --rank signal.value --use-nonoverlapping-peaks &\n\n'.format(
+        peaks_processing_dir, 
+        dataset_name,
+        peaks_processing_dir,
+        peaks_processing_dir))
+
+    # Bash command to run IDR module to calculate peak IDR based on union peak set versus SICER2 peak set
+    peaks_processing_script.write('idr -s {}/{}_all_peaks_calculated.broadPeak {}/IDR_files/SICER2_IDR_input.broadPeak -o {}/IDR_files/SICER2_IDR_output.tsv --input-file-type broadPeak --rank signal.value --use-nonoverlapping-peaks &\n\n'.format(
+        peaks_processing_dir, 
+        dataset_name,
+        peaks_processing_dir,
+        peaks_processing_dir))
+
+    # Bash command to run IDR module to calculate peak IDR based on union peak set versus HOMER peak set
+    peaks_processing_script.write('idr -s {}/{}_all_peaks_calculated.broadPeak {}/IDR_files/HOMER_IDR_input.broadPeak -o {}/IDR_files/HOMER_IDR_output.tsv --input-file-type broadPeak --rank signal.value --use-nonoverlapping-peaks &\n\n'.format(
+        peaks_processing_dir, 
+        dataset_name,
+        peaks_processing_dir,
+        peaks_processing_dir))
+
+    # Bash command to run IDR module to calculate peak IDR based on union peak set versus Genrich peak set
+    peaks_processing_script.write('idr -s {}/{}_all_peaks_calculated.broadPeak {}/IDR_files/Genrich_IDR_input.broadPeak -o {}/IDR_files/Genrich_IDR_output.tsv --input-file-type broadPeak --rank signal.value --use-nonoverlapping-peaks &\n\n'.format(
+        peaks_processing_dir, 
+        dataset_name,
+        peaks_processing_dir,
+        peaks_processing_dir))
+
+    peaks_processing_script.write('wait\n\n')
+
+
+    # Bash command to run the IDR_integrator.py to integrate the results above into the full peak list dataset_name_all_peaks_calculated.tsv
+    peaks_processing_script.write('IDR_integrator.py --input_tsv {}/{}_all_peaks_calculated.tsv --idr_tsv {}/IDR_files/MACS2_IDR_output.tsv {}/IDR_files/SICER2_IDR_output.tsv {}/IDR_files/HOMER_IDR_output.tsv {}/IDR_files/Genrich_IDR_output.tsv --output_tsv {}/{}_all_peaks_calculated.tsv\n\n'.format(
+        peaks_processing_dir, 
+        dataset_name,
+        peaks_processing_dir,
+        peaks_processing_dir,
+        peaks_processing_dir,
+        peaks_processing_dir,
+        peaks_processing_dir,
+        dataset_name))
+
+
+
 # Bash commands to call the home-made script peak_caller_stats_calculator.py to generate 
 #   a separate summary custom_setting_table file that shows the statistics 
 #   (tag counts, fold changes, motif hits, motif hits rate, positive peaks rate) 
@@ -3468,11 +3683,6 @@ peaks_processing_script.write('peak_caller_stats_calculator.py {}/{}_all_peaks_c
     dataset_name, 
     peaks_processing_dir, 
     dataset_name))
-
-# # Bash commands to filter out all peaks that are exclusively called only by one peak caller
-# peaks_processing_script.write('cat {}/{}_all_peaks_calculated.tsv | '.format(peaks_processing_dir, dataset_name))
-# peaks_processing_script.write("""awk '$8 > 1'""")
-# peaks_processing_script.write(' > {}/{}_all_peaks_filtered.tsv\n\n'.format(peaks_processing_dir, dataset_name))
 
 peaks_processing_script.close() # Closing the script '22_peaks_processing_script.sh'. Flushing the write buffer
 
@@ -3491,8 +3701,8 @@ if not os.path.exists(supplementary_annotations_dir):
 # Create a script "23_go_annotation_script.sh" within, that will iterate through various HOMER 
 #   gene ontology database (resulting from HOMER annotatePeaks.pl program call with -go flag toggled on) 
 #   and append every relevant gene ontology terms to each peak)
-# In: setname_all_peaks_calculated.tsv (input from 22_peaks_processing_script.sh)
-# Out: setname_all_peaks_GO_annotated.tsv
+# In: dataset_name_all_peaks_calculated.tsv (input from 22_peaks_processing_script.sh)
+# Out: dataset_name_all_peaks_GO_annotated.tsv
 
 go_annotation_script_name = '{}/23_go_annotation_script.sh'.format(supplementary_annotations_dir)
 
@@ -3519,8 +3729,8 @@ go_annotation_script.close() # Closing the script '23_go_annotation_script.sh'. 
 # Create a script "23_pathway_annotation_script.sh" within, that will iterate through various HOMER 
 #   database (resulting from HOMER annotatePeaks.pl program call with -go flag toggled on) 
 #   and append every relevant pathways, cooccurences, and interactions to each peak)
-# In: setname_all_peaks_calculated.tsv (input from 22_peaks_processing_script.sh)
-# Out: setname_all_peaks_pathway_annotated.tsv
+# In: dataset_name_all_peaks_calculated.tsv (input from 22_peaks_processing_script.sh)
+# Out: dataset_name_all_peaks_pathway_annotated.tsv
 
 pathway_annotation_script_name = '{}/23_pathway_annotation_script.sh'.format(supplementary_annotations_dir)
 
@@ -3549,8 +3759,8 @@ pathway_annotation_script.close() # Closing the script '23_pathway_annotation_sc
 # When both GO and pathway annotations are toggled on when calling the suite, 
 #   the pathway annotation script will automatically process further the GO-annotated peak list file, 
 #   resulting in each peak having all annotations from both functions. 
-# In: setname_all_peaks_calculated.tsv (input from 22_peaks_processing_script.sh)
-# Out: setname_all_peaks_GO_pathway_annotated.tsv
+# In: dataset_name_all_peaks_calculated.tsv (input from 22_peaks_processing_script.sh)
+# Out: dataset_name_all_peaks_GO_pathway_annotated.tsv
 
 go_pathway_annotation_script_name = '{}/23_go_pathway_annotation_script.sh'.format(supplementary_annotations_dir)
 
@@ -3603,7 +3813,7 @@ if peak_type == 'narrow':
     #       Consensus peak set if "consensus" is given as an argument for --homer_motif flag in ChIP-AP command line
     #       Union peak set if "union" is given as an argument for --homer_motif_flag in ChIP-AP command line
     #       Both consensus and union peak set if "both" is given as an argument for --homer_motif_flag in ChIP-AP command line
-    # In: setname_all_peaks_calculated.tsv (input from 22_peaks_processing_script.sh)
+    # In: dataset_name_all_peaks_calculated.tsv (input from 22_peaks_processing_script.sh)
     # Out: homerResults.html and knownResults.html (all the individual enriched motifs can be accessed through these .html files)
 
     homer_motif_enrichment_consensus_script_name = '{}/24_homer_motif_enrichment_consensus_script.sh'.format(homer_motif_enrichment_dir)
@@ -3689,7 +3899,7 @@ if peak_type == 'narrow':
     #       Consensus peak set if "consensus" is given as an argument for --meme_motif flag in ChIP-AP command line
     #       Union peak set if "union" is given as an argument for --meme_motif_flag in ChIP-AP command line
     #       Both consensus and union peak set if "both" is given as an argument for --meme_motif_flag in ChIP-AP command line
-    # In: setname_all_peaks_calculated.tsv (input from 22_peaks_processing_script.sh)
+    # In: dataset_name_all_peaks_calculated.tsv (input from 22_peaks_processing_script.sh)
     # Out: meme-chip.html (all the enriched motifs and modular analysis results can be accessed through this .html file)
 
 
@@ -3710,12 +3920,13 @@ if peak_type == 'narrow':
     meme_motif_enrichment_consensus_dir = '{}/25_meme_motif_enrichment/consensus_peak_set'.format(output_dir)
     meme_motif_enrichment_consensus_script.write('mkdir -p {}\n\n'.format(meme_motif_enrichment_consensus_dir))
 
-    meme_motif_enrichment_consensus_script.write('meme_sequence_extractor.py --input {}/{}_all_peaks_calculated.tsv --fastadir {}/bwa --chrsizedir {}/chrom.sizes --outputdir {} --ref {} --background --filter 4\n\n'.format(peaks_processing_dir,
-                                    dataset_name,
-                                    genome_dir,
-                                    genome_dir,
-                                    meme_motif_enrichment_consensus_dir,
-                                    genome_ref))
+    meme_motif_enrichment_consensus_script.write('meme_sequence_extractor.py --input {}/{}_all_peaks_calculated.tsv --fastadir {}/bwa --chrsizedir {}/chrom.sizes --outputdir {} --ref {} --background --masked --filter 4\n\n'.format(
+        peaks_processing_dir,
+        dataset_name,
+        genome_dir,
+        genome_dir,
+        meme_motif_enrichment_consensus_dir,
+        genome_ref))
 
     # Bash commands to call meme-chip to perform motif enrichment analysis based on ChIP-AP consensus peak set. One command, one run for every one replicate.
     for list_counter in range(len(fasta_suffix_list)):
@@ -3748,12 +3959,13 @@ if peak_type == 'narrow':
     meme_motif_enrichment_union_dir = '{}/25_meme_motif_enrichment/union_peak_set'.format(output_dir)
     meme_motif_enrichment_union_script.write('mkdir -p {}\n\n'.format(meme_motif_enrichment_union_dir))
 
-    meme_motif_enrichment_union_script.write('meme_sequence_extractor.py --input {}/{}_all_peaks_calculated.tsv --fastadir {}/bwa --chrsizedir {}/chrom.sizes --outputdir {} --ref {} --background --filter 1\n\n'.format(peaks_processing_dir,
-                                    dataset_name,
-                                    genome_dir,
-                                    genome_dir,
-                                    meme_motif_enrichment_union_dir,
-                                    genome_ref))
+    meme_motif_enrichment_union_script.write('meme_sequence_extractor.py --input {}/{}_all_peaks_calculated.tsv --fastadir {}/bwa --chrsizedir {}/chrom.sizes --outputdir {} --ref {} --background --masked --filter 1\n\n'.format(
+        peaks_processing_dir,
+        dataset_name,
+        genome_dir,
+        genome_dir,
+        meme_motif_enrichment_union_dir,
+        genome_ref))
 
     # Bash commands to call meme-chip to perform motif enrichment analysis based on ChIP-AP union peak set. One command, one run for every one replicate.
     for list_counter in range(len(fasta_suffix_list)):
@@ -3795,29 +4007,30 @@ master_script.write('#!/bin/bash\n\n')
 master_script.write('set -euxo pipefail\n\n')
 master_script.write('ulimit -n 2000\n\n')
 
-master_script.write('echo Creating a renamed copy of raw data in the output directory.\n')
-master_script.write('{}\n\n'.format(raw_data_script_name))
+if start_from_bam == False:
+    master_script.write('echo Creating a renamed copy of raw data in the output directory.\n')
+    master_script.write('{}\n\n'.format(raw_data_script_name))
 
-master_script.write('echo Running quality check on the raw sequencing reads\n')
-master_script.write('{}\n\n'.format(raw_reads_quality_control_script_name))
+    master_script.write('echo Running quality check on the raw sequencing reads\n')
+    master_script.write('{}\n\n'.format(raw_reads_quality_control_script_name))
 
-master_script.write('echo Removing optical and tile-edge duplicates with bbmap clumpify\n')
-master_script.write('{}\n\n'.format(deduplicating_script_name))
+    master_script.write('echo Removing optical and tile-edge duplicates with bbmap clumpify\n')
+    master_script.write('{}\n\n'.format(deduplicating_script_name))
 
-master_script.write('echo Trimming the left sequencing adapter from each read with bbmap bbduk\n')
-master_script.write('{}\n\n'.format(adapter_trimming_script_name))
+    master_script.write('echo Trimming the left sequencing adapter from each read with bbmap bbduk\n')
+    master_script.write('{}\n\n'.format(adapter_trimming_script_name))
 
-master_script.write('echo Trimming low quality bases and drop low quality reads using trimmomatic\n')
-master_script.write('{}\n\n'.format(quality_trimming_script_name))
+    master_script.write('echo Trimming low quality bases and drop low quality reads using trimmomatic\n')
+    master_script.write('{}\n\n'.format(quality_trimming_script_name))
 
-master_script.write('echo Running quality check on the preprocessed sequencing reads.\n')
-master_script.write('{}\n\n'.format(preprocessed_reads_quality_control_script_name))
+    master_script.write('echo Running quality check on the preprocessed sequencing reads.\n')
+    master_script.write('{}\n\n'.format(preprocessed_reads_quality_control_script_name))
 
-master_script.write('echo Aligning the paired-ends sequenced reads to {} using bwa mem algorithm\n'.format(genome_ref))
-master_script.write('{}\n\n'.format(bwa_mem_aligning_script_name))
+    master_script.write('echo Aligning the paired-ends sequenced reads to {} using bwa mem algorithm\n'.format(genome_ref))
+    master_script.write('{}\n\n'.format(bwa_mem_aligning_script_name))
 
-master_script.write('echo Filtering the aligned reads according to MAPQ score\n')
-master_script.write('{}\n\n'.format(mapq_filtering_script_name))
+    master_script.write('echo Filtering the aligned reads according to MAPQ score\n')
+    master_script.write('{}\n\n'.format(mapq_filtering_script_name))
 
 master_script.write('echo Sorting, indexing and generating coverages of the filtered aligned reads\n')
 master_script.write('{}\n\n'.format(results_script_name))
@@ -3876,8 +4089,9 @@ if args.homer_motif and peak_type == 'narrow': # Motif enrichment analyses are o
 
     if args.homer_motif == 'both': # If user wants analysis on both peak sets
         master_script.write('echo Performing motif enrichment analysis on the consensus peak set with HOMER findMotifsGenome.pl\n')
-        master_script.write('echo Performing motif enrichment analysis on the union peak set with HOMER findMotifsGenome.pl\n')
         master_script.write('{} &\n\n'.format(homer_motif_enrichment_consensus_script_name))
+
+        master_script.write('echo Performing motif enrichment analysis on the union peak set with HOMER findMotifsGenome.pl\n')
         master_script.write('{}\n\n'.format(homer_motif_enrichment_union_script_name))
 
 if args.meme_motif and peak_type == 'narrow': # Motif enrichment analyses are only performed on datasets with narrow peaks
@@ -3891,8 +4105,9 @@ if args.meme_motif and peak_type == 'narrow': # Motif enrichment analyses are on
 
     if args.meme_motif == 'both': # If user wants analysis on both peak sets
         master_script.write('echo Performing motif enrichment analysis on the consensus peak set with meme-chip\n')
-        master_script.write('echo Performing motif enrichment analysis on the union peak set with meme-chip\n')
         master_script.write('{} &\n\n'.format(meme_motif_enrichment_consensus_script_name))
+
+        master_script.write('echo Performing motif enrichment analysis on the union peak set with meme-chip\n')
         master_script.write('{}\n\n'.format(meme_motif_enrichment_union_script_name))
 
 master_script.close() # Closing the script 'MASTER_script.sh'. Flushing the write buffer
