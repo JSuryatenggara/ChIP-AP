@@ -332,7 +332,7 @@ The same track of aligned reads is scanned for potential protein-DNA binding sit
 
 20. **Irreproducibility rate (IDR) calculation**. Performed by a custom script plugged to IDR module. The IDR module compares two different peak sets and assign to each listed peak in both peak sets an irreproducibility rate (IDR) value based on that peak’s capacity to be recalled by the other peak set. IDR value of each peak listed in the full (union) peak list ([setname]_all_peaks_calculated.tsv) was obtained by pairing it against every individual peak caller sets, followed by calculating the pair-wise -logIDR values, then summing them all up, and finally converting it into a final IDR value. The final IDR value shows the chance of a finding (i.e., the peak) being unable to be reproduced by different peak calling algorithms. This step reprocesses the peak list [setname]_all_peaks_calculated.tsv, augment the table with relevant IDR values, and re-save it under the same file name. For more details about IDR calculation method, see the IDR module documentations.
 
-    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_22.5.PNG>  
+    <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/Output/output_box_22_1.PNG>  
 
     **How does it look like?** Detailed output preview of step 18, 19, 20, and 21 are combined below step 21
 
