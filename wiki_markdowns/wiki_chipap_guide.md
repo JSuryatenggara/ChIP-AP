@@ -1,6 +1,6 @@
 <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/ChIP-AP_logo.png>
 
-This documentation is available as a pdf [here](https://github.com/JSuryatenggara/ChIP-AP/blob/main/New/ChIP-AP_documentation.pdf).
+This documentation is available as a pdf [here](https://github.com/JSuryatenggara/ChIP-AP/blob/main/Guides/ChIP-AP%20Documentation.pdf).
 
 ## Introduction
 ChIP-Seq is a technique used to analyze protein-DNA interactions and identify the binding sites of said protein. Briefly, protein is fixed/attached to the DNA, then, samples are fragmented and a pull-down is performed with an anti-body targeted to the protein of interest to extract the protein-DNA complexes where binding to DNA has occurred. The samples are then sequenced and analyzed. A key step in the bioinformatics analysis is the calling of “peaks,” or regions of enrichment, corresponding to binding sites of the protein to the DNA.
@@ -99,7 +99,7 @@ Before attempting to install ChIP-AP on your local machine, make sure your hardw
 1. Before setting up ChIP-AP, Anaconda 3 MUST be installed first. Simply search 
 “Anaconda 3 individual install” in your search-engine of choice and download and install the correct setup for your operating system (OS). We’ll wait here till you’ve done this…
 
-2. ChIP-AP can be downloaded from our GitHub repo. Direct download link: https://github.com/JSuryatenggara/ChIP-AP/raw/main/chipap_installation.zip
+2. ChIP-AP can be downloaded from our GitHub repo. Direct download link: https://github.com/JSuryatenggara/ChIP-AP/releases
 
 3. After downloading ChIP-AP, move the downloaded ChIP-AP package archive to a directory of your choosing and unzip the content there. This will be the installation directory for ChIP-AP
 
@@ -141,7 +141,7 @@ In each of these entry fields, user may key in the flag arguments as they are wr
 | <nobr><b>Argument/Flag</b></nobr> | <nobr><b>Possible Values</b></nobr> | <nobr><b>Detailed Explanation</b></nobr> |
 |-|-|-|
 | <nobr>--mode</nobr> | <nobr>single / paired</nobr> | Single-end or paired-end sequencing analysis. If a paired-end run, files will typically be labelled ending in *_R1 and *_R2 before the file extension. If these labels aren’t present then likely, you have single-ended sequencing data and select the “single” option. |
-| <nobr>--genome</nobr> | <nobr>[directory]</nobr> | Your genome folder directory. Requires full path, not relative path. This is the folder where the pre-computed genome alignment and processing files are saved. These genomes can be downloaded from (https://www.dropbox.com/s/073mpy8aho4vjda/chipap_genomes.zip?dl=0) or instead you can compute your own (a guide for this is coming soon actually… Keep an eye on the wiki…) |
+| <nobr>--genome</nobr> | <nobr>[directory]</nobr> | Your genome folder directory. Requires full path, not relative path. This is the folder where the pre-computed genome alignment and processing files are saved. These genomes can be downloaded from (https://www.dropbox.com/s/ioqd3hwdahh9xon/genomes.zip) or instead you can compute your own (a guide for this is coming soon actually… Keep an eye on the wiki…) |
 | <nobr>--output</nobr> | <nobr>[directory]</nobr> | Your desired output folder. Requires full path, not relative path. |
 | <nobr>--setname</nobr> | <nobr>[text]</nobr> | The prefix to label output and intermediate files (no space allowed). ChIP-AP will rename all processed data files to have this “setname” prefix. |
 
@@ -406,7 +406,21 @@ In addition, the custom-made script also makes some reformatting and provides ad
     Output	: 22_peaks_processing / [setname]_all_peaks_calculated.tsv
 	          (Ready to view, if user does not wish for gene ontology or pathway annotations)
 
-### 20. Peak statistics summary. 
+### 20. Irreproducibility rate (IDR) calculation.
+Performed by a custom script plugged to IDR module. The IDR module compares two different peak sets and assign to each listed peak in both peak sets an irreproducibility rate (IDR) value based on that peak’s capacity to be recalled by the other peak set. IDR value of each peak listed in the full (union) peak list ([setname]_all_peaks_calculated.tsv) was obtained by pairing it against every individual peak caller sets, followed by calculating the pair-wise -logIDR values, then summing them all up, and finally converting it into a final IDR value. The final IDR value shows the chance of a finding (i.e., the peak) being unable to be reproduced by different peak calling algorithms. This step reprocesses the peak list [setname]_all_peaks_calculated.tsv, augment the table with relevant IDR values, and re-save it under the same file name. For more details about IDR calculation method, see the IDR module documentations.
+
+    Modular script used: 22_peaks_processing_script.sh
+    Calls   : IDR_integrator.py, IDR
+    Input   : 22_peaks_processing / [setname]_all_peaks_calculated.tsv
+    Process : Calculate -logIDR of peaks between union vs MACS2 peak set
+              Calculate -logIDR of peaks between union vs GEM/SICER2 peak set
+              Calculate -logIDR of peaks between union vs HOMER peak set
+              Calculate -logIDR of peaks between union vs Genrich peak set
+              Calculate IDR value of peaks from the sum of -logIDR values
+    Output  : 22_peaks_processing / [setname]_all_peaks_calculated.tsv
+    (Ready to view, if user does not wish for gene ontology or pathway annotations)
+
+### 21. Peak statistics summary. 
 Performed by a custom script designed for quality assessment of called peaks. Returns a summary text file containing information pertaining to the peak read depth, peak fold enrichment, known motif hits, and positive peak hits (based on known motif presence), in each peak set along the continuum between single peak callers and the absolute consensus of all four peak callers.
 
     Modular script used: 22_peaks_processing_script.sh
@@ -415,7 +429,7 @@ Performed by a custom script designed for quality assessment of called peaks. Re
     Process	: Generate a separate summary table of key statistics in peak callers performance 
     Output	: 22_peaks_processing / [setname]_peak_caller_combinations_statistics.tsv
 
-### 21. (Optional) Downstream analysis: Gene ontology enrichment. 
+### 22. (Optional) Downstream analysis: Gene ontology enrichment. 
 Each peak in the concatenated list is appended with all the gene ontology terms associated with its gene annotation. The gene ontology terms are derived from biological processes, molecular functions, and cellular compartments databases. This enables list filtering based on the gene ontology terms of the study’s interest
 
     Modular script used: 23_go_annotation_script.sh
@@ -424,7 +438,7 @@ Each peak in the concatenated list is appended with all the gene ontology terms 
     Process	: Append related gene ontology terms to the list of peaks
     Output	: 23_supplementary_annotations / [setname]_all_peaks_go_annotated.tsv
 
-### 22. (Optional) Downstream analysis: Pathway enrichment. 
+### 23. (Optional) Downstream analysis: Pathway enrichment. 
 Each peak in the concatenated list is appended with all the related biological pathways associated with its gene annotation. The biological pathway terms are derived from KEGG, SMPDB, Biocyc, Reactome, Wikipathways, and pathwayInteractionDB databases. This enables list filtering based on the biological pathways of the study’s interest. Additionally, this analysis also adds other terms pertaining to known interactions with common proteins and known gene mutations found in malignant cases, derived from common protein interaction and COSMIC databases, respectively.
 
     Modular script used: 23_pathway_annotation_script.sh
@@ -433,7 +447,7 @@ Each peak in the concatenated list is appended with all the related biological p
     Process	: Append known pathways and interactions to the list of peaks
     Output	: 23_supplementary_annotations / [setname]_all_peaks_pathway_annotated.tsv
 
-### 23. (Optional) Downstream analysis: Motif enrichment analysis with HOMER. 
+### 24. (Optional) Downstream analysis: Motif enrichment analysis with HOMER. 
 Genomic sequences are extracted based on the coordinates of the peaks in consensus (four peak callers overlap), union (all called peaks), or both peak lists. HOMER performs analysis to identify specific DNA sequence motifs to which the experimented protein(s) have binding affinity towards. For the sake of processing speed, HOMER utilizes cumulative binomial distribution to calculate motif enrichment by default. However, by utilizing ChIP-AP custom setting table, user may choose to utilize cumulative hypergeometric distribution, which describes motif enrichment problem more accurately. Besides the typically performed calculations for de novo motifs discovery, HOMER also calculates the enrichment scores of the known motifs in HOMER motifs database. Since the relevance of protein-DNA binding events are mainly more restricted to the context of transcription factors compared to its histone modifiers counterpart, this optional downstream analysis option is only available for datasets with narrow (transcription factor) peaks.
 
     Modular script used: 24_homer_motif_enrichment_consensus_script.sh
@@ -444,7 +458,7 @@ Genomic sequences are extracted based on the coordinates of the peaks in consens
     Output  : 24_homer_motif_enrichment / ... / homerResults.html
               24_homer_motif_enrichment / ... / knownResults.html
 
-### 24. (Optional) Downstream analysis: Motif enrichment analysis with MEME. Genomic
+### 25. (Optional) Downstream analysis: Motif enrichment analysis with MEME. Genomic
 sequences are extracted based on the coordinates of the peaks in consensus (four peak callers overlap), union (all called peaks), or both peak lists. With or without control sequences extracted from random genomic sequences, MEME performs analysis to identify specific DNA sequence motifs to which the experimented protein(s) have binding affinity towards. By utilizing separate dedicated modules included in MEME suite, MEME-ChIP performs de novo motif discovery, motif enrichment analysis, motif location analysis and motif clustering in one go, providing a comprehensive picture of the DNA motifs that are enriched in the extracted sequences. MEME-ChIP performs two complementary types of de novo motif discovery: weight matrix–based discovery for high accuracy, and word-based discovery for high sensitivity. Since the relevance of protein-DNA binding events are mainly more restricted to the context of transcription factors compared to its histone
 modifiers counterpart, this optional downstream analysis option is only available for datasets with narrow (transcription factor) peaks.
 
@@ -503,7 +517,7 @@ The table below shows the contents of [setname]_all_peaks_go_pathway_annotated.t
         <tr>
             <td><nobr><b>Column 7 (G)</td>
             <td><nobr>Peak Caller Overlaps</td>
-            <td rowspan=6>
+            <td rowspan=8>
                 <b>Pipeline script:</b><br>22_peaks_processing_script.sh
                 <br><b>Called script:</b><br>fold_change_calculator.py
                 <br><b>Output file:</b><br>[setname]_all_peaks_calculated.tsv
@@ -522,7 +536,7 @@ The table below shows the contents of [setname]_all_peaks_go_pathway_annotated.t
             <td><nobr><b>Column 10 (J)</td>
             <td><nobr>Fold Change</td>
         </tr>
-                <tr>
+        <tr>
             <td><nobr><b>Column 11 (K)</td>
             <td><nobr>Peak Center</td>
         </tr>
@@ -532,6 +546,14 @@ The table below shows the contents of [setname]_all_peaks_go_pathway_annotated.t
         </tr>
         <tr>
             <td><nobr><b>Column 13 (M)</td>
+            <td><nobr>negLog10_IDR</td>
+        </tr>
+        <tr>
+            <td><nobr><b>Column 14 (N)</td>
+            <td><nobr>IDR</td>
+        </tr>
+        <tr>
+            <td><nobr><b>Column 15 (O)</td>
             <td><nobr>Annotation</td>
             <td rowspan=14>
                 <b>Pipeline script:</b><br>22_peaks_processing_script.sh
@@ -541,59 +563,59 @@ The table below shows the contents of [setname]_all_peaks_go_pathway_annotated.t
             </td>
         </tr>
         <tr>
-            <td><nobr><b>Column 14 (N)</td>
+            <td><nobr><b>Column 16 (P)</td>
             <td><nobr>Detailed Annotation</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 15 (O)</td>
+            <td><nobr><b>Column 17 (Q)</td>
             <td><nobr>Distance to TSS</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 16 (P)</td>
+            <td><nobr><b>Column 18 (R)</td>
             <td><nobr>Nearest PromoterID</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 17 (Q)</td>
+            <td><nobr><b>Column 19 (S)</td>
             <td><nobr>Entrez ID</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 18 (R)</td>
+            <td><nobr><b>Column 20 (T)</td>
             <td><nobr>Nearest Unigene</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 19 (S)</td>
+            <td><nobr><b>Column 21 (U)</td>
             <td><nobr>Nearest Refseq</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 20 (T)</td>
+            <td><nobr><b>Column 22 (V)</td>
             <td><nobr>Nearest Ensembl</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 21 (U)</td>
+            <td><nobr><b>Column 23 (W)</td>
             <td><nobr>Gene Name</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 22 (V)</td>
+            <td><nobr><b>Column 24 (X)</td>
             <td><nobr>Gene Alias</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 23 (W)</td>
+            <td><nobr><b>Column 25 (Y)</td>
             <td><nobr>Gene Description</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 24 (X)</td>
+            <td><nobr><b>Column 26 (Z)</td>
             <td><nobr>Gene Type</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 25 (Y)</td>
+            <td><nobr><b>Column 27 (AA)</td>
             <td><nobr>CpG%</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 26 (Z)</td>
+            <td><nobr><b>Column 28 (AB)</td>
             <td><nobr>GC%</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 27 (AA)</td>
+            <td><nobr><b>Column 29 (AC)</td>
             <td><nobr>Biological Process</td>
             <td rowspan=3>
                 <b>Pipeline script:</b><br>23_go_annotation_script.sh
@@ -603,15 +625,15 @@ The table below shows the contents of [setname]_all_peaks_go_pathway_annotated.t
             </td>
         </tr>
         <tr>
-            <td><nobr><b>Column 28 (AB)</td>
+            <td><nobr><b>Column 30 (AD)</td>
             <td><nobr>Molecular Function</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 29 (AC)</td>
+            <td><nobr><b>Column 31 (AE)</td>
             <td><nobr>Cellular Component</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 30 (AD)</td>
+            <td><nobr><b>Column 32 (AF)</td>
             <td><nobr>Interaction with Common Protein</td>
             <td rowspan=8>
                 <b>Pipeline script:</b><br>23_pathway_annotation_script.sh
@@ -621,31 +643,31 @@ The table below shows the contents of [setname]_all_peaks_go_pathway_annotated.t
             </td>
         </tr>
         <tr>
-            <td><nobr><b>Column 31 (AE)</td>
+            <td><nobr><b>Column 33 (AG)</td>
             <td><nobr>Somatic Mutations (COSMIC)</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 32 (AF)</td>
+            <td><nobr><b>Column 34 (AH)</td>
             <td><nobr>Pathway (KEGG)</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 33 (AG)</td>
+            <td><nobr><b>Column 35 (AI)</td>
             <td><nobr>Pathway (BIOCYC)</td>
         </tr>
         <tr>
-           <td><nobr><b>Column 34 (AH)</td>
+           <td><nobr><b>Column 36 (AJ)</td>
             <td><nobr>Pathway (pathwayInteractionDB)</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 35 (AI)</td>
+            <td><nobr><b>Column 37 (AK)</td>
             <td><nobr>Pathway (REACTOME)</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 36 (AJ)</td>
+            <td><nobr><b>Column 38 (AL)</td>
             <td><nobr>Pathway (SMPDB)</td>
         </tr>
         <tr>
-            <td><nobr><b>Column 37 (AK)</td>
+            <td><nobr><b>Column 39 (AM)</td>
             <td><nobr>Pathway (Wikipathways)</td>
         </tr>
     </tbody>
@@ -813,7 +835,6 @@ Below is an example of setting table file in its default-setting state:
 | <b>fold_change_calculator | --normfactor uniquely_mapped |
 | <b>homer_findMotifsGenome | -size given -mask | 
 | <b>meme_chip | -meme-nmotifs 25 |
-
 
 As can be seen, certain flags and values for some programs have been preset as per our testing and opinions. A point to note however, some flags for programs, such as -BAMPE in MACS2, are not listed since they are “hard-coded” into the pipeline and cannot be modified. For this example of -BAMPE in MACS2, this is “hard-coded” because this flag is essential for running peak calling in paired-end datsets. Parameters and flags like this that must be set are “hard-coded” and hidden and cannot be changed unless by choosing the appropriate narrow/broad run modes. A listing of all these “hard-coded” parameters can be found in the next section.
 
@@ -1283,7 +1304,16 @@ Based on our testing, Genrich tends to misbehave when processing datasets with l
 
 To avoid the aforementioned peak calling depth issue, we curtail such behavior by setting up an auto-adjusting p value threshold that responsively raises the default limit of peak’s minimum p value as the read depth gets lower using the following equations Q1, Q2, Q3.
 
-<img src="https://github.com/JSuryatenggara/ChIP-AP/blob/storage/images/genrich_equation_guide.PNG">
+<img src="https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/genrich_equation_guide.PNG">
+
+<br>
+
+## Irreproducibility Rate (IDR) Calculation
+The irreproducible discovery rate (IDR) calculations for all peaks are integrated into a ChIP AP run. As the IDR suite calculate peak reproducibility rate between two replicates (i.e., peak sets) only, we chose as “replicates” each individual peak caller set and the union peak set. The output full peak list (union peak set) is ranked by number of detecting peak callers and fold change of sample signal over input, whereas the individual peak caller sets are ranked by peak score (or fold change if peak score is not available).
+
+Reproducibility of all peaks in the output full peak list are calculated based on their detectability by different individual peak callers, and ranked accordingly. These four -log IDR values are copied into the output full peak list, providing four -log IDR values for every peak, which are then summed and converted into a final IDR value.
+
+<img src="https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/idr_equation_guide.PNG">
 
 <br>
 
@@ -1439,6 +1469,11 @@ Version 5.0
 - Software update check implemented at the beginning of pipeline.
     - Informing users of newer version of ChIP-AP script(s) available on GitHub.
 
+Version 5.1
+- Peak reproducibility (IDR) calculations are now intergrated into ChIP-AP pipeline
+    - Using the IDR module, calculates IDR value of each peak in the full peak list: dataset_name_all_peaks_calculated.tsv
+- Reads aligned chr_alt, chr_fix, chrN_random, chrUn, and chrM in externally aligned .bam files are now properly filtered out
+
 
 <br>
 
@@ -1450,7 +1485,7 @@ Lastly, if you use ChIP-AP in your analysis, please cite us and all the followin
 
 | Program | Reference |
 |-|-|
-| ChIP-AP<br>v5.0 | Guide: https://github.com/JSuryatenggara/ChIP-AP/wiki/ChIP-AP-Guide<br>Github: https://github.com/JSuryatenggara/ChIP-AP<br>Citation: https://www.biorxiv.org/content/10.1101/2021.04.18.440382v1 |
+| ChIP-AP<br>v5.1 | Guide: https://github.com/JSuryatenggara/ChIP-AP/wiki/ChIP-AP-Guide<br>Github: https://github.com/JSuryatenggara/ChIP-AP<br>Citation: https://www.biorxiv.org/content/10.1101/2021.04.18.440382v1 |
 | Python3<br>Linux 3.7.x / 3.8.x<br>macOS 3.7.x | We have noted in our testing that there is a change in python 3.8 on macOS in how multi-threading is handled which breaks ChIP-AP.  As such, for macOS installs you must ensure that ptyhon3.7.x is installed.  If using our installation guides, the provided yml files will ensure all the correct dependencies and requirements are met automatically.<br>|
 | FastQC<br>v0.11.9 | Guide: https://www.bioinformatics.babraham.ac.uk/projects/fastqc/<br>GitHub: https://github.com/s-andrews/FastQC |
 | Clumpify<br>v38.18 (BBmap) | Introduction: https://www.biostars.org/p/225338/<br>Guide: https://jgi.doe.gov/data-and-tools/bbtools/bb-tools-user-guide/clumpify-guide/<br>GitHub: https://github.com/BioInfoTools/BBMap/blob/master/sh/clumpify.sh<br>Citation: https://www.osti.gov/biblio/1241166-bbmap-fast-accurate-splice-aware-aligner
@@ -1466,6 +1501,7 @@ Lastly, if you use ChIP-AP in your analysis, please cite us and all the followin
 | Genrich<br>v0.6 | Guide: https://informatics.fas.harvard.edu/atac-seq-guidelines.html<br>GitHub: https://github.com/jsh58/Genrich |
 | HOMER<br>mergePeaks<br>v4.11 (HOMER) | Guide: http://homer.ucsd.edu/homer/ngs/mergePeaks.html<br>Citation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2898526/ |
 | HOMER<br>annotatePeaks<br>v4.11 (HOMER) | Guide: http://homer.ucsd.edu/homer/ngs/annotation.html<br>Citation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2898526/ |
+| IDR<br>v2.0.4.2 | GitHub: https://github.com/nboley/idr<br>Citation: https://projecteuclid.org/journals/annals-of-applied-statistics/volume-5/issue-3/Measuring-reproducibility-of-high-throughput-experiments/10.1214/11-AOAS466.full |
 | HOMER<br>findMotifsGenome<br>v4.11 (HOMER) | Guide: http://homer.ucsd.edu/homer/ngs/peakMotifs.html<br>Citation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2898526/
 | MEME<br>meme-chip<br>V5.0.5 (MEME) | Guide: https://meme-suite.org/meme/doc/meme-chip.html<br> Citation: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2703892/ | 
 
