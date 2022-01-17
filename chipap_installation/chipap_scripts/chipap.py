@@ -169,8 +169,11 @@ script_version = '5.1'
 #                       New home-made script IDR_integrator.py is used to integrate IDR values obtained from IDR module results above
 #                   Reads aligned chr_alt, chr_fix, chrN_random, chrUn, and chrM in externally aligned .bam files are now properly filtered out
 #                       Only relevant when sample inputs are .bam files instead of .fastq
-
-
+#
+#   Version 5.2     !!! ChIP-AP is now published in Briefings in Bioinformatics! Check our paper to get more insight on how it can be very useful for your ChIP-seq! !!!
+#                   Fixed a bug in GEM peak caller where ChIP and control files flags and arguments sometimes are buggy when multiple replicates are involved
+#                   'overwrite=t' is added to bbduk.sh command line to allow overwriting if any of its output file already exist 
+#                   Fixed a bug in script Genrich.py where ChIP and control files flags and arguments sometimes are buggy when -adjustp flag is not in use
 
 # Import required modules
 from os.path import dirname as up
@@ -1907,7 +1910,7 @@ if start_from_bam == False:
     # Bash commands to call clumpify.sh to trim adapter sequences from the left flank of reads in the fq.gz files
     if read_mode == 'single':
         for list_counter in range(len(chip_name)):
-            adapter_trimming_script.write('bbduk.sh in={}/{}.deduped.fq.gz out={}/{}.adaptertrimmed.fq.gz ref={}/bbmap/adapters.fa {} 1>{}/logs/{}.adapter_trimming.out 2>{}/logs/{}.adapter_trimming.err &\n\n'.format(
+            adapter_trimming_script.write('bbduk.sh in={}/{}.deduped.fq.gz out={}/{}.adaptertrimmed.fq.gz ref={}/bbmap/adapters.fa {} overwrite=t 1>{}/logs/{}.adapter_trimming.out 2>{}/logs/{}.adapter_trimming.err &\n\n'.format(
                 deduplicating_dir, 
                 chip_name[list_counter], 
                 adapter_trimming_dir, 
@@ -1931,7 +1934,7 @@ if start_from_bam == False:
         adapter_trimming_script.write('wait\n\n')
 
         for list_counter in range(len(ctrl_name)):
-            adapter_trimming_script.write('bbduk.sh in={}/{}.deduped.fq.gz out={}/{}.adaptertrimmed.fq.gz ref={}/bbmap/adapters.fa {} 1>{}/logs/{}.adapter_trimming.out 2>{}/logs/{}.adapter_trimming.err &\n\n'.format(
+            adapter_trimming_script.write('bbduk.sh in={}/{}.deduped.fq.gz out={}/{}.adaptertrimmed.fq.gz ref={}/bbmap/adapters.fa {} overwrite=t 1>{}/logs/{}.adapter_trimming.out 2>{}/logs/{}.adapter_trimming.err &\n\n'.format(
                 deduplicating_dir, 
                 ctrl_name[list_counter], 
                 adapter_trimming_dir, 
@@ -1955,7 +1958,7 @@ if start_from_bam == False:
 
     if read_mode == 'paired':
         for list_counter in range(len(chip_name)):
-            adapter_trimming_script.write('bbduk.sh in={}/{}.deduped.fq.gz in2={}/{}.deduped.fq.gz out={}/{}.adaptertrimmed.fq.gz out2={}/{}.adaptertrimmed.fq.gz ref={}/bbmap/adapters.fa {} 1>{}/logs/{}.adapter_trimming.out 2>{}/logs/{}.adapter_trimming.err &\n\n'.format(
+            adapter_trimming_script.write('bbduk.sh in={}/{}.deduped.fq.gz in2={}/{}.deduped.fq.gz out={}/{}.adaptertrimmed.fq.gz out2={}/{}.adaptertrimmed.fq.gz ref={}/bbmap/adapters.fa {} overwrite=t 1>{}/logs/{}.adapter_trimming.out 2>{}/logs/{}.adapter_trimming.err &\n\n'.format(
                 deduplicating_dir, 
                 chip_r1_name[list_counter], 
                 deduplicating_dir, 
@@ -1984,7 +1987,7 @@ if start_from_bam == False:
         adapter_trimming_script.write('wait\n\n')
 
         for list_counter in range(len(ctrl_name)):
-            adapter_trimming_script.write('bbduk.sh in={}/{}.deduped.fq.gz in2={}/{}.deduped.fq.gz out={}/{}.adaptertrimmed.fq.gz out2={}/{}.adaptertrimmed.fq.gz ref={}/bbmap/adapters.fa {} 1>{}/logs/{}.adapter_trimming.out 2>{}/logs/{}.adapter_trimming.err &\n\n'.format(
+            adapter_trimming_script.write('bbduk.sh in={}/{}.deduped.fq.gz in2={}/{}.deduped.fq.gz out={}/{}.adaptertrimmed.fq.gz out2={}/{}.adaptertrimmed.fq.gz ref={}/bbmap/adapters.fa {} overwrite=t 1>{}/logs/{}.adapter_trimming.out 2>{}/logs/{}.adapter_trimming.err &\n\n'.format(
                 deduplicating_dir, 
                 ctrl_r1_name[list_counter], 
                 deduplicating_dir, 
@@ -2988,8 +2991,8 @@ if peak_type == 'narrow':
 
     # Converting both ChIP and control .bam lists from vertical lists into space-separated 
     #   serial string (to be used as an input argument in GEM)
-    gem_chip_list = ['--expt {}/{}.bam'.format(results_dir, chip_name[list_counter]) for list_counter in range(len(chip_name))]
-    gem_ctrl_list = ['--ctrl {}/{}.bam'.format(results_dir, ctrl_name[list_counter]) for list_counter in range(len(ctrl_name))]
+    gem_chip_list = ['{}/{}.bam'.format(results_dir, chip_name[list_counter]) for list_counter in range(len(chip_name))]
+    gem_ctrl_list = ['{}/{}.bam'.format(results_dir, ctrl_name[list_counter]) for list_counter in range(len(ctrl_name))]
     gem_chip_string = ' '.join(gem_chip_list)
     gem_ctrl_string = ' '.join(gem_ctrl_list)
 
@@ -3001,10 +3004,10 @@ if peak_type == 'narrow':
     # GEM peak caller harnesses the knowledge of the genomic sequence, which is why reference genome is required.
     # GEM peak caller is calling peaks while considering all the possible binding motifs, 
     #   thus it is required to set the range of motif length to be considered (k_min to k_max)
-    gem_peak_calling_script.write('java -jar {} {} --t {} --d {}/GEM/Read_Distribution_default.txt --g {}/GEM/{}.chrom.sizes --genome {}/GEM/{}_Chr_FASTA --s {} {} {} --f SAM --out {}/{}_GEM 1> {}/logs/{}.GEM.out 2> {}/logs/{}.GEM.err\n\n'.format(
+    gem_peak_calling_script.write('java -jar {} {} --t {} --d {}/GEM/Read_Distribution_default.txt --g {}/GEM/{}.chrom.sizes --genome {}/GEM/{}_Chr_FASTA --s {} --expt {} --ctrl {} --f SAM --out {}/{}_GEM 1> {}/logs/{}.GEM.out 2> {}/logs/{}.GEM.err\n\n'.format(
         gem_full_path, 
         gem_arg, 
-        cpu_count, 
+        (cpu_count/2), 
         genome_dir, 
         genome_dir, 
         genome_ref, 
