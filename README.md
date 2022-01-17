@@ -459,11 +459,14 @@ When ChIP-AP is run, a copy of the used settings table is saved as a tab-separat
 
 If you have a custom settings table made and provided it as input, then ChIP-AP will make a 2nd copy of this table in the same output save folder. This decision is made as it is useful documentation of the run performed. This file is also useful for re-running of the pipeline after run failure or some tweaking if necessary. If submitting an issue request on Github, you must provide us your settings table used as well as all other requested information. See Github for details regarding this.
 
-**<u>We consider the dissemination of the information of this file as vital and essential along with results obtained. The table can be included as a supplemental table in a manuscript or can be included as a processed data file when submitting data to GEO – either way, the information of this file must be presented when publishing data.</u>**
-
+**We consider the dissemination of the information of this file as vital and essential along with results obtained. The table can be included as a supplemental table in a manuscript or can be included as a processed data file when submitting data to GEO – either way, the information of this file must be presented when publishing data.**
+		    
 Below is an example of setting table file in its default-setting state:
 
-| <b>program</b> | <b>argument</b> |
+**Note:** When running GEM, to ensure absolute reproducibility of all results every single run, you **MUST** add the flag "--t 1" to the DST below. When GEM is run in multi-threaded mode, its results are not reproducible over multiple runs even with the same parameters (although they are very close to each other). This is an issue we raised with the developers and is out of our hands. We highly doubt they will fix this aspect of GEM's behaviour. Therefore if 100% reproducibility of results is key for you, run in single-threaded mode only - even if it will take longer to run.
+		    
+
+| program | argument |
 |-|-|
 | <b>fastqc1 | -q |
 | <b>clumpify | dedupe spany addcount qout=33 fixjunk |
@@ -482,6 +485,8 @@ Below is an example of setting table file in its default-setting state:
 | <b>homer_mergePeaks |  |
 | <b>homer_annotatePeaks |  |
 | <b>fold_change_calculator | --normfactor uniquely_mapped |
+| <b>homer_findMotifsGenome | -size given -mask | 
+| <b>meme_chip | -meme-nmotifs 25 |
 
 As can be seen, certain flags and values for some programs have been preset as per our testing and opinions. A point to note however, some flags for programs, such as -BAMPE in MACS2, are not listed since they are “hard-coded” into the pipeline and cannot be modified. For this example of -BAMPE in MACS2, this is “hard-coded” because this flag is essential for running peak calling in paired-end datsets. Parameters and flags like this that must be set are “hard-coded” and hidden and cannot be changed unless by choosing the appropriate narrow/broad run modes. A listing of all these “hard-coded” parameters can be found in our [documentation](https://github.com/JSuryatenggara/ChIP-AP/wiki/ChIP-AP-Guide).
 <br>
