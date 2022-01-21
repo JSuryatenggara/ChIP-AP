@@ -2991,8 +2991,8 @@ if peak_type == 'narrow':
 
     # Converting both ChIP and control .bam lists from vertical lists into space-separated 
     #   serial string (to be used as an input argument in GEM)
-    gem_chip_list = ['{}/{}.bam'.format(results_dir, chip_name[list_counter]) for list_counter in range(len(chip_name))]
-    gem_ctrl_list = ['{}/{}.bam'.format(results_dir, ctrl_name[list_counter]) for list_counter in range(len(ctrl_name))]
+    gem_chip_list = ['--expt {}/{}.bam'.format(results_dir, chip_name[list_counter]) for list_counter in range(len(chip_name))]
+    gem_ctrl_list = ['--ctrl {}/{}.bam'.format(results_dir, ctrl_name[list_counter]) for list_counter in range(len(ctrl_name))]
     gem_chip_string = ' '.join(gem_chip_list)
     gem_ctrl_string = ' '.join(gem_ctrl_list)
 
@@ -3004,7 +3004,7 @@ if peak_type == 'narrow':
     # GEM peak caller harnesses the knowledge of the genomic sequence, which is why reference genome is required.
     # GEM peak caller is calling peaks while considering all the possible binding motifs, 
     #   thus it is required to set the range of motif length to be considered (k_min to k_max)
-    gem_peak_calling_script.write('java -jar {} {} --t {} --d {}/GEM/Read_Distribution_default.txt --g {}/GEM/{}.chrom.sizes --genome {}/GEM/{}_Chr_FASTA --s {} --expt {} --ctrl {} --f SAM --out {}/{}_GEM 1> {}/logs/{}.GEM.out 2> {}/logs/{}.GEM.err\n\n'.format(
+    gem_peak_calling_script.write('java -jar {} {} --t {} --d {}/GEM/Read_Distribution_default.txt --g {}/GEM/{}.chrom.sizes --genome {}/GEM/{}_Chr_FASTA --s {} {} {} --f SAM --out {}/{}_GEM 1> {}/logs/{}.GEM.out 2> {}/logs/{}.GEM.err\n\n'.format(
         gem_full_path, 
         gem_arg, 
         (cpu_count/2), 
