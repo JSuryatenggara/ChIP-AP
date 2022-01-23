@@ -171,6 +171,8 @@ The command line that was used to call the pipeline will be located in a text fi
 | <nobr>--deltemp</nobr> | | This flag will instruct to delete large intermediary files right after they are not going to be used for further processes (eg intermediary fq files. This option will save a significant amount of space by the end of your analysis, so recommended. |
 | <nobr>--thread</nobr> | <nobr>[integer]</nobr> | Maximum number of processes to use. Default is half the maximum available on your system so as to not choke it during the run. If running on a laptop or low-thread count cpu, best to push this up to maximum number threads available -1 – but this will significantly slow your laptop if attempting other tasks while ChIP-AP is running. |
 | <nobr>--run</nobr> | | Use to immediately run the suite by running the master script. This is the big red button ok... Use at your own risk! <br> When not used, the generated master script (MASTER_script.sh) in the output folder can be run manually by user. We have made sure that when you tell ChIP-AP “do not press the big red button” that it will behave and do as you say. |
+| <nobr>--homer_motif</nobr> | consensus /<br> union / both | This flag will instruct HOMER (findMotifsGenome.pl) to perform motif enrichment analysis at the end of the pipeline run. |
+| <nobr>--meme_motif</nobr> | consensus /<br> union / both | This flag will instruct MEME (meme-chip) to perform motif enrichment analysis at the end of the pipeline run. |
 
 <br>
 
