@@ -578,7 +578,7 @@ There are a couple of things to look for to answer this question. 1, the fingerp
     4. Also as part of your submission to GEO or as a supplemental table in your manuscript, you MUST include the settings table named “default_settings_table.txt” located in the root analysis directory. This provided with the raw fq files, which must be uploaded to GEO, will ensure complete reproducibility of the analysis performed.
     5. Manuscript details for M&M. A statement such as the following should suffice:
     
-        For processing our ChIP-Seq analysis, we utilized ChIP-AP (https://academic.oup.com/bib/advance-article/doi/10.1093/bib/bbab537/6489109). Raw fq files are uploaded to GEO with accession number GSE172355, and the custom settings table utilized for analysis can be found on GEO as a processed settings file and also in supplemental table XX in our manuscript. Full details of ChIP-AP and its function can be found in its corresponding manuscript (https://academic.oup.com/bib/advance-article/doi/10.1093/bib/bbab537/6489109).
+        For processing our ChIP-Seq analysis, we utilized ChIP-AP (https://academic.oup.com/bib/advance-article/doi/10.1093/bib/bbab537/6489109). Raw fq files are uploaded to GEO with accession number GSE172355, and the custom settings table utilized for analysis can be found on GEO as a processed settings file and also in Table 1 in our manuscript. Full details of ChIP-AP and its function can be found in its corresponding manuscript (https://academic.oup.com/bib/advance-article/doi/10.1093/bib/bbab537/6489109).
 
 <br>
 		    
