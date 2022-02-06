@@ -44,7 +44,7 @@ ChIP-AP is a fully automated ChIP-seq data processing and analysis pipeline:
 <br>
 
 ## Computational requirements
-<b>OS</b> – Linux (Ubuntu-variants 16.04+ tested), MacOS (10.13+), Windows 10 (v1903+)
+<b>OS</b> – Linux (Ubuntu-variants 16.04+ tested), MacOS (10.13+), Windows 10 (v1903+), Windows 11
 
 <b>CPU</b> – (minimum) Quad-Core Intel/AMD CPU, (recommended) Octa-Core Intel/AMD CPU. ChIP-AP will NOT run on newer Apple Silicon (M1) CPU’s – not yet anyways…
 
@@ -171,6 +171,8 @@ The command line that was used to call the pipeline will be located in a text fi
 | <nobr>--deltemp</nobr> | | This flag will instruct to delete large intermediary files right after they are not going to be used for further processes (eg intermediary fq files. This option will save a significant amount of space by the end of your analysis, so recommended. |
 | <nobr>--thread</nobr> | <nobr>[integer]</nobr> | Maximum number of processes to use. Default is half the maximum available on your system so as to not choke it during the run. If running on a laptop or low-thread count cpu, best to push this up to maximum number threads available -1 – but this will significantly slow your laptop if attempting other tasks while ChIP-AP is running. |
 | <nobr>--run</nobr> | | Use to immediately run the suite by running the master script. This is the big red button ok... Use at your own risk! <br> When not used, the generated master script (MASTER_script.sh) in the output folder can be run manually by user. We have made sure that when you tell ChIP-AP “do not press the big red button” that it will behave and do as you say. |
+| <nobr>--homer_motif</nobr> | consensus /<br> union / both | This flag will instruct HOMER (findMotifsGenome.pl) to perform motif enrichment analysis at the end of the pipeline run. |
+| <nobr>--meme_motif</nobr> | consensus /<br> union / both | This flag will instruct MEME (meme-chip) to perform motif enrichment analysis at the end of the pipeline run. |
 
 <br>
 
@@ -576,7 +578,7 @@ There are a couple of things to look for to answer this question. 1, the fingerp
     4. Also as part of your submission to GEO or as a supplemental table in your manuscript, you MUST include the settings table named “default_settings_table.txt” located in the root analysis directory. This provided with the raw fq files, which must be uploaded to GEO, will ensure complete reproducibility of the analysis performed.
     5. Manuscript details for M&M. A statement such as the following should suffice:
     
-        For processing our ChIP-Seq analysis, we utilized ChIP-AP (https://academic.oup.com/bib/advance-article/doi/10.1093/bib/bbab537/6489109). Raw fq files are uploaded to GEO with accession number GSE172355, and the custom settings table utilized for analysis can be found on GEO as a processed settings file and also in supplemental table XX in our manuscript. Full details of ChIP-AP and its function can be found in its corresponding manuscript (https://academic.oup.com/bib/advance-article/doi/10.1093/bib/bbab537/6489109).
+        For processing our ChIP-Seq analysis, we utilized ChIP-AP (https://academic.oup.com/bib/advance-article/doi/10.1093/bib/bbab537/6489109). Raw fq files are uploaded to GEO with accession number GSE172355, and the custom settings table utilized for analysis can be found on GEO as a processed settings file and also in Table 1 in our manuscript. Full details of ChIP-AP and its function can be found in its corresponding manuscript (https://academic.oup.com/bib/advance-article/doi/10.1093/bib/bbab537/6489109).
 
 <br>
 		    
