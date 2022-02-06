@@ -154,12 +154,11 @@ args = parser.parse_args()
 read_mode = args.mode
 
 chip_bam_list = [os.path.abspath(chip_bam) for chip_bam in args.t]
+genrich_chip_string = ','.join(chip_bam_list)
 
 if args.c:
     ctrl_bam_list = [os.path.abspath(ctrl_bam) for ctrl_bam in args.c]
-
-genrich_chip_string = ','.join(chip_bam_list)
-genrich_ctrl_string = ','.join(ctrl_bam_list)
+    genrich_ctrl_string = ','.join(ctrl_bam_list)
 
 output_dir = os.path.abspath(args.o)
 
