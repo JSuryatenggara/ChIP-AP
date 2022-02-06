@@ -44,7 +44,7 @@ ChIP-AP is a fully automated ChIP-seq data processing and analysis pipeline:
 <br>
 
 ## Computational requirements
-<b>OS</b> – Linux (Ubuntu-variants 16.04+ tested), MacOS (10.13+), Windows 10 (v1903+)
+<b>OS</b> – Linux (Ubuntu-variants 16.04+ tested), MacOS (10.13+), Windows 10 (v1903+), Windows 11
 
 <b>CPU</b> – (minimum) Quad-Core Intel/AMD CPU, (recommended) Octa-Core Intel/AMD CPU. ChIP-AP will NOT run on newer Apple Silicon (M1) CPU’s – not yet anyways…
 
