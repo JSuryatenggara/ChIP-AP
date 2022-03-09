@@ -3007,7 +3007,7 @@ if peak_type == 'narrow':
     gem_peak_calling_script.write('java -jar {} {} --t {} --d {}/GEM/Read_Distribution_default.txt --g {}/GEM/{}.chrom.sizes --genome {}/GEM/{}_Chr_FASTA --s {} {} {} --f SAM --out {}/{}_GEM 1> {}/logs/{}.GEM.out 2> {}/logs/{}.GEM.err\n\n'.format(
         gem_full_path, 
         gem_arg, 
-        (cpu_count/2), 
+        math.ceil(cpu_count/2), 
         genome_dir, 
         genome_dir, 
         genome_ref, 
