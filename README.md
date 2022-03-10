@@ -148,7 +148,7 @@ The command line that was used to call the pipeline will be located in a text fi
 | <nobr><b>Argument/Flag</b></nobr> | <nobr><b>Possible Values</b></nobr> | <nobr><b>Detailed Explanation</b></nobr> |
 |-|-|-|
 | <nobr>--mode</nobr> | <nobr>single / paired</nobr> | Single-end or paired-end sequencing analysis. If a paired-end run, files will typically be labelled ending in *_R1 and *_R2 before the file extension. If these labels aren’t present then likely, you have single-ended sequencing data and select the “single” option. |
-| <nobr>--genome</nobr> | <nobr>[directory]</nobr> | Your genome folder directory. Requires full path, not relative path. This is the folder where the pre-computed genome alignment and processing files are saved. These genomes can be downloaded from (https://www.dropbox.com/s/073mpy8aho4vjda/chipap_genomes.zip?dl=0) or instead you can compute your own (a guide for this is coming soon actually… Keep an eye on the wiki…) |
+| <nobr>--genome</nobr> | <nobr>[directory]</nobr> | Your genome folder directory. Requires full path, not relative path. This is the folder where the pre-computed genome alignment and processing files are saved. These genomes can be downloaded from [dropbox](https://www.dropbox.com/s/ioqd3hwdahh9xon/genomes.zip) or instead you can compute your own (a guide for this is coming soon actually… Keep an eye on the wiki…) |
 | <nobr>--output</nobr> | <nobr>[directory]</nobr> | Your desired output folder. Requires full path, not relative path. |
 | <nobr>--setname</nobr> | <nobr>[text]</nobr> | The prefix to label output and intermediate files (no space allowed). ChIP-AP will rename all processed data files to have this “setname” prefix. |
 
