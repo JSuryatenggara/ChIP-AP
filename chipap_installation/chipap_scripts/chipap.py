@@ -464,22 +464,20 @@ for program in program_update_check_list:
     except:
         print('{} is no longer required in the latest implementation of ChIP-AP'.format(program.split('/')[-1]))
         continue
-        
-    try:
-        local_file = open('{}/{}'.format(local_directory, program), 'r')
+            
+    if which(program) is None:
+        local_file = open(which(program), 'r')
 
-    except:
+        if remote_file.text == local_file.read():
+            print('{} is up to date'.format(program.split('/')[-1]))
+
+        elif remote_file.text != local_file.read():
+            update_counter += 1
+            print('Newer version of {} is available on our github'.format(program.split('/')[-1]))
+
+    else:
         print('WARNING: {} is not found in your local system'.format(program.split('/')[-1]))
         continue
-
-
-    if remote_file.text == local_file.read():
-        print('{} is up to date'.format(program.split('/')[-1]))
-
-    elif remote_file.text != local_file.read():
-        update_counter += 1
-        print('Newer version of {} is available on our github'.format(program.split('/')[-1]))
-
 
 if update_counter == 0:
     print('\nYour ChIP-AP is up to date\n')
