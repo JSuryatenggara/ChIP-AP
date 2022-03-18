@@ -466,6 +466,10 @@ for program in program_update_check_list:
         continue
             
     if which(program) is None:
+        print('WARNING: {} is not found in your local system'.format(program.split('/')[-1]))
+        continue
+
+    else:
         local_file = open(which(program), 'r')
 
         if remote_file.text == local_file.read():
@@ -474,11 +478,7 @@ for program in program_update_check_list:
         elif remote_file.text != local_file.read():
             update_counter += 1
             print('Newer version of {} is available on our github'.format(program.split('/')[-1]))
-
-    else:
-        print('WARNING: {} is not found in your local system'.format(program.split('/')[-1]))
-        continue
-
+            
 if update_counter == 0:
     print('\nYour ChIP-AP is up to date\n')
 
