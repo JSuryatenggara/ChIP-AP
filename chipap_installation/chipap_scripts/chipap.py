@@ -2,7 +2,7 @@
 #pyright: reportUnboundVariable=false
 
 
-script_version = '5.1'
+script_version = '5.3'
 
 
 # A fully automated ChIP-seq pipeline, processes raw sequencing reads (or aligned reads),
@@ -435,23 +435,19 @@ current_dir = str(pathlib.Path(__file__).parent.absolute())
 
 print('Checking for updates on GitHub\n')
 
-remote_directory = 'https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/chipap_installation'
+remote_directory = 'https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/main/chipap_installation/chipap_scripts'
 
-chipap_scripts_dir = str(pathlib.Path(__file__).parent.absolute())
-chipap_installation_dir = '/'.join((chipap_scripts_dir.split('/'))[:-1])
-local_directory = chipap_installation_dir
-
-program_update_check_list = ['chipap_scripts/chipap.py',
-                            'chipap_scripts/chipap_dashboard.py',
-                            'chipap_scripts/chipap_wizard.py',
-                            'chipap_scripts/Genrich.py',
-                            'chipap_scripts/fold_change_calculator.py',
-                            'chipap_scripts/IDR_integrator.py',
-                            'chipap_scripts/GO_annotator.py',
-                            'chipap_scripts/pathway_annotator.py',
-                            'chipap_scripts/peak_caller_stats_calculator.py',
-                            'chipap_scripts/meme_sequence_extractor.py',
-                            'chipap_scripts/default_settings_table.tsv']
+program_update_check_list = ['chipap.py',
+                            'chipap_dashboard.py',
+                            'chipap_wizard.py',
+                            'Genrich.py',
+                            'fold_change_calculator.py',
+                            'IDR_integrator.py',
+                            'GO_annotator.py',
+                            'pathway_annotator.py',
+                            'peak_caller_stats_calculator.py',
+                            'meme_sequence_extractor.py',
+                            'default_settings_table.tsv']
 
 
 update_counter = 0
@@ -466,6 +462,7 @@ for program in program_update_check_list:
         continue
             
     if which(program) is None:
+        print(which(program))
         print('WARNING: {} is not found in your local system'.format(program.split('/')[-1]))
         continue
 
