@@ -174,6 +174,10 @@ script_version = '5.3'
 #                   Fixed a bug in GEM peak caller where ChIP and control files flags and arguments sometimes are buggy when multiple replicates are involved
 #                   'overwrite=t' is added to bbduk.sh command line to allow overwriting if any of its output file already exist 
 #                   Fixed a bug in script Genrich.py where ChIP and control files flags and arguments sometimes are buggy when -adjustp flag is not in use
+#
+#   Version 5.3     Fixed issue where GEM was given a non-integer value for its -t flag argument
+#
+#   Version 5.4     Fixed issue in chipap
 
 # Import required modules
 from os.path import dirname as up
@@ -331,7 +335,7 @@ parser.add_argument('--custom_setting_table',
                     help = '<Optional> Expert mode. Your 2*n-sized table file containing custom arguments for every modules.')
 
 parser.add_argument('--fcmerge', 
-                    help = '<Optional> Use to force fold change analysis based on merged replicates instead of on each replicate', 
+                    help = '<Optional> Use to force fold change calculation based on merged replicates instead of on each replicate. This will automatically be activated when the number of ChIP samples are unequal to control samples.', 
                     action = 'store_true')
 
 parser.add_argument('--motif', 
@@ -706,24 +710,6 @@ else:
         # When unequal sample replicate number occurs, user will be immediately prompted on screen
         print('The number of ChIP replicates ({}) do not equal to control replicates ({}).'.format(len(chip_name), len(ctrl_name)))
         print('The peak fold change value would be reported based on the merged reads of all ChIP and control replicates, instead of on each replicate ChIP-control pairs')
-
-        while True:
-            # Then the user will be asked whether to accept the merged fold change analysis
-            user_answer = input('Do you accept this? (Y/N)')
-
-            # Accept and continue:
-            if user_answer.lower() == 'y':
-                print('You accepted. Program will now continue.')
-                break
-            
-            # Decline and exit
-            if user_answer.lower() == 'n':
-                print('You declined. Exitting.')
-                quit()
-            
-            # Neither and the same question will be re-asked
-            else:
-                print('Invalid input. Please try again.')
 
 
 

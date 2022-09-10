@@ -1,7 +1,7 @@
 program	argument
 fastqc1	-q
 clumpify	dedupe spany addcount qout=33 fixjunk
-bbduk	ktrim=l hdist=2
+bbduk	ktrim=r k=21 mink=8 hdist=2 hdist2=1
 trimmomatic	LEADING:20 SLIDINGWINDOW:4:20 TRAILING:20 MINLEN:20
 fastqc2	-q
 bwa_mem	

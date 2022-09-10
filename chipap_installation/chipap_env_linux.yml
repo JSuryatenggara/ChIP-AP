@@ -128,7 +128,7 @@ dependencies:
   - python-dateutil=2.8.1=pyhd3eb1b0_0
   - python_abi=3.7=1_cp37m
   - qt=5.9.7=h5867ecd_1
-  - r-base=3.2.2=0
+  - r
   - readline=7.0=h7b6447c_5
   - retrying=1.3.3=py37_2
   - samtools=1.9=h10a08f8_12
@@ -156,4 +156,3 @@ dependencies:
     - pytz==2021.1
     - requests==2.26.0
     - urllib3==1.26.6
-prefix: /home/jeremiah/tools/anaconda3/envs/chipap

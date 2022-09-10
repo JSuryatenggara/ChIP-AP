@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 #pyright: reportUnboundVariable=false
 
+script_version = '2.2'
 
-# script_version = '2.1'    - When installing ChIP-AP in its own environment, the environment name will now be the name
-#                               user typed in when prompted in the terminal, instead of "python3_chipap"
-#                           - Replaces the "name:" and "prefix:" lines in the .yml file(s) if they already exist
-#                           - Adds the "name:" and "prefix:" lines into the .yml file(s) if they did not yet exist
-#                           - Motif enrichment analysis suite meme (version 5.0.5) has been added to both .yml files
+# PATCH NOTES
+
+#   Version 2.1     When installing ChIP-AP in its own environment, the environment name will now be the name
+#                       user typed in when prompted in the terminal, instead of "python3_chipap"
+#                   Replaces the "name:" and "prefix:" lines in the .yml file(s) if they already exist
+#                   Adds the "name:" and "prefix:" lines into the .yml file(s) if they did not yet exist
+#                   Motif enrichment analysis suite meme (version 5.0.5) has been added to both .yml files
+#
+#   Version 2.2     Fixed issue where the installer would crash if anaconda is not installed under "anaconda3" parent directory name
 
 
 import shutil
@@ -35,8 +40,32 @@ def replace_path(input_file, old_string, new_string):
     writing_file.close()
 
 
-conda_file = shutil.which('conda') # Get the full path to anaconda 3
-conda_dir = '{}/anaconda3'.format(conda_file.split('/anaconda3/')[0]) # Get the parent directory of anaconda 3
+conda_file = shutil.which('conda') # Get the full path to conda executable
+
+if 'anaconda3' in conda_file.split('/'):
+    conda_dir = '{}/anaconda3'.format(conda_file.split('/anaconda3/')[0]) # Get the parent directory of anaconda 3
+
+else:
+    conda_dir = '/'.join(conda_file.split('/')[0:(conda_file.split('/').index('bin'))])
+
+    if conda_dir + '/bin/conda' != conda_file:   
+
+        while True: # Infinite loop until broken by user action
+            user_conda = input('Installer could not identify anaconda parent directory. \
+                Your anaconda installation probably has a different parent directory name. \
+                To continue, please type in the full path to your anaconda parent directory (e.g., "/home/username/Anaconda"). \
+                The more sure way to do this is to call "which conda" in your terminal, and copy and paste the output up to the anaconda parent directory \
+                (e.g., if "which conda" output = "/home/username/Anaconda/bin/conda", then paste in "/home/username/Anaconda".')
+
+            if user_conda.split('/') in conda_file.split('/'):
+                conda_dir = user_conda
+                print('Anaconda directory confirmed. Continuing installation.')
+                break
+
+            else:
+                print('Anaconda directory is incorrect or not found. Please try again.') # Prompt them to try again
+
+print('Anaconda directory is {}'.format(conda_dir))
 
 while True: # Infinite loop until broken by user action
     user_answer = input('Do you want to install ChIP-AP in a specific environment? (Y/N) ') # Proceed only after the user provided Y or N answer to this question
