@@ -9,6 +9,7 @@ dependencies:
   - _libgcc_mutex=0.1=main
   - _r-mutex=1.0.0=anacondar_1
   - bbmap=38.18=0
+  - bedtools
   - blas=1.0=mkl
   - bwa=0.7.17=hed695b0_7
   - bzip2=1.0.8=h7b6447c_0

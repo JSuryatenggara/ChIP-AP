@@ -2,7 +2,7 @@
 #pyright: reportUnboundVariable=false
 
 
-script_version = '5.3'
+script_version = '5.4'
 
 
 # A fully automated ChIP-seq pipeline, processes raw sequencing reads (or aligned reads),
@@ -177,7 +177,19 @@ script_version = '5.3'
 #
 #   Version 5.3     Fixed issue where GEM was given a non-integer value for its -t flag argument
 #
-#   Version 5.4     Fixed issue in chipap
+#   Version 5.4     --fcmerge flag will now automatically be activated when the number of ChIP samples are unequal to control samples without requiring any user prompt.
+#                   chipap_installer.py now works for anaconda installed under a different parent directory name other than “anaconda3”
+#                       Upon not finding “anaconda3” parent directory name, the installer will attempt to recognize the actual parent directory name, in which file bin/conda is located.
+#                           As a failsafe measure, upon still being unable to find anaconda parent directory, 
+#                           the installer will prompt the user to manually key in the full path to anaconda parent directory, before proceeding with the installation.
+#                   The .yaml files for ChIP-AP installation have been updated
+#                       The R version the line “r-base=3.2.2=0” trying to install cannot be found anymore in anaconda. 
+#                           To fix this issue, and possibly similar issues in the future, 
+#                           the line has now been simplified to be able to flexibly find and install any compatible R version:
+#                               “r-base=3.2.2=0” changed to “r”
+#                   default_settings_table.tsv has been updated
+#                       Due to the prevalence of Illumina NGS in the field, the default arguments for adapter trimming by BBDuk has been changed to better trim read-through adapter sequences at the 3’ end of reads:
+#                           “ktrim=l hdist=2” changed to “ktrim=r k=21 mink=8 hdist=2 hdist2=1”
 
 # Import required modules
 from os.path import dirname as up
@@ -708,8 +720,8 @@ else:
     else: 
         force_merge = 1
         # When unequal sample replicate number occurs, user will be immediately prompted on screen
-        print('The number of ChIP replicates ({}) do not equal to control replicates ({}).'.format(len(chip_name), len(ctrl_name)))
-        print('The peak fold change value would be reported based on the merged reads of all ChIP and control replicates, instead of on each replicate ChIP-control pairs')
+        print('\nThe number of ChIP replicates ({}) do not equal to control replicates ({}).'.format(len(chip_name), len(ctrl_name)))
+        print('The peak fold change value would be reported based on the merged reads of all ChIP and control replicates, instead of on each replicate ChIP-control pairs\n\n')
 
 
 
