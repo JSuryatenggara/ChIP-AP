@@ -46,7 +46,7 @@ ChIP-AP is a fully automated ChIP-seq data processing and analysis pipeline:
 ## Computational requirements
 <b>OS</b> – Linux (Ubuntu-variants 16.04+ tested), MacOS (10.13+), Windows 10 (v1903+), Windows 11
 
-<b>CPU</b> – (minimum) Quad-Core Intel/AMD CPU, (recommended) Octa-Core Intel/AMD CPU. ChIP-AP will NOT run on newer Apple Silicon (M1) CPU’s – not yet anyways…
+<b>CPU</b> – (minimum) Quad-Core Intel/AMD CPU, (recommended) Octa-Core Intel/AMD CPU. Apple Silicon Macs are compatible though Rosetta 2.
 
 <b>RAM</b> – (minimum) 8Gb, (recommended) 16Gb+
 
@@ -55,14 +55,10 @@ ChIP-AP is a fully automated ChIP-seq data processing and analysis pipeline:
 <b>Screen Resolution</b> – A minimum resolution of 1920*1080 is required for the dashboard interface. If your screen resolution is less than this, you will be limited to only using the wizard
 <br>
 
-### Pre-Configured Images and Available Online Portal
-For users who do not wish to try to configure things on their own, we provide 2 usage options:
+### Pre-Configured Image
+For users who do not wish to try to configure things on their own, we provide a preconfigured virtual machine image for use. Users can download a pre-configured virtual-machine image to run in VirtualBox (Oracle VM VirtualBox). A detailed tutorial can be found on our wiki [here](https://github.com/JSuryatenggara/ChIP-AP/wiki/Virtual-Machine-Installation-Guide). 
 
-1. Users can download a pre-configured virtual-machine image to run in VirtualBox (Oracle VM VirtualBox). A detailed tutorial can be found on our wiki [here](https://github.com/JSuryatenggara/ChIP-AP/wiki/Virtual-Machine-Installation-Guide). 
-
-2. Users can use the [Cancer Science Institute of Singapore’s Next-Generation Sequencing Portal](https://csibioinfo.nus.edu.sg/csingsportal/login/home.php) (CSI NGS Portal, (An et al., 2020)).
-
-    Using the NGS Portal, users can upload their data to a secure processing server, setup a ChIP-AP run, and wait for the results. This option does not require users to set anything up on their local machines, simply upload your data and use the service. Data uploaded is accessible only to your user account and not shared publically. Data and analyses are deleted from the server after 10 days. This is an ideal option if you will only do few analyses or do not have the hardware to run ChIP-AP yourself – and can be done without a bioinformatician's input. The pipeline will run with default parameters and so no configuration is required although the option to upload the custom settings table does still exist (more details on this later and in our detailed documentation).
+We do recommend installing ChIP-AP locally though.
 <br>
 
 ## Software Installation
