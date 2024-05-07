@@ -11,6 +11,7 @@
 	Developed by Jeremiah Suryatenggara and Mahmoud A. Bassal
 </p>
 
+<br>
 
 ## Introduction
 ChIP-Seq is a technique used to analyse protein-DNA interactions and identify the binding sites of said protein. A key step in the bioinformatics analysis is the calling of “peaks,” or regions of enrichment, corresponding to binding sites of the protein to the DNA. 
