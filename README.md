@@ -60,6 +60,7 @@ ChIP-AP is a fully automated ChIP-seq data processing and analysis pipeline:
 For users who do not wish to try to configure things on their own, we provide a preconfigured virtual machine image for use. Users can download a pre-configured virtual-machine image to run in VirtualBox (Oracle VM VirtualBox). A detailed tutorial can be found on our wiki [here](https://github.com/JSuryatenggara/ChIP-AP/wiki/Virtual-Machine-Installation-Guide). 
 
 We do recommend installing ChIP-AP locally though.
+
 <br>
 
 ## Software Installation
@@ -94,6 +95,7 @@ and then execute it. The installer will then ask you a couple of questions regar
 	chipap_dashboard.py
 
 depending on your preference of running.
+
 <br>
 
 ## Quick start – For Command line User Only
@@ -138,7 +140,6 @@ The command line that was used to call the pipeline will be located in a text fi
 
 <br>
 
-
 ## Usage notes and Command Line Flags / Parameters
 ### Required Arguments
 
@@ -173,7 +174,6 @@ The command line that was used to call the pipeline will be located in a text fi
 
 <br>
 
-
 ## Running ChIP-AP with Graphical Interfaces
 ChIP-AP offers 2 graphical interfaces for running – depending on a users proficiency with ChIP-AP. They are the _chipap_dashboard_ and the _chipap_wizard_.
 
@@ -205,17 +205,16 @@ A customized pipeline run is possible by providing the required flag arguments f
 <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/setting_table_guide.png width="500">
 </p>
 In each of these entry fields, user may key in the flag arguments as they are written for each corresponding program (e.g., “-q 20” for samtools view which will filter reads with a MAPQ > 20). This requires user to read dedicated official manuals to understand what and how these arguments can be given to the corresponding program in the pipeline. This, accompanied with the fact that bad/wrong flag arguments may break the pipeline run, shows that this manual customization of pipeline programs settings is recommended for experienced users only, and that inexperienced users should stick with the default settings or get a bioinformaticians input.
+
 <br>
-
-
 
 ## ChIP-AP Graphical Overview
 <p align="center">
 <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/chipap_workflow_guide.png>
 </p>
 <b>For detailed explanations of all the steps and methodologies used throughout ChIP-AP refer to our documentation (https://github.com/JSuryatenggara/ChIP-AP/wiki/ChIP-AP-Guide)</b>
-<br>
 
+<br>
 
 ## Main Pipeline Output
 ### Final Analysis Table (including supplementary annotations)
@@ -409,7 +408,6 @@ The table below shows the contents of [setname]_all_peaks_go_pathway_annotated.t
 
 <br>
 
-
 ### Pipeline Run Info
 This file summarizes the assignment of the files (IP sample or control, read 1 or 2; replicate number) and the file name conversion for every unaligned or aligned sequencing reads to be processed. Each line tells the user what the original files have been renamed into. Check this file if you suspect the order of samples were incorrectly entered (i.e., swapped chip with control)
 
@@ -430,7 +428,6 @@ This file summarizes the assignment of the files (IP sample or control, read 1 o
     Control dataset replicate 2, 2nd read : Original filename = h.fastq --> New filename = setname _ctrl_rep2_R2.fq.gz
 
 <br>
-
 
 ### Sample Table
 Contains the full path of each input ChIP and control sample in the pipeline run in a tab-separated value file: [setname]_sample_table.tsv in the output save folder in ChIP-AP sample table format. This is useful for documentation of the run, and for re-running of the pipeline after a run failure or some tweaking if need be. Below is an example of sample table file content (header included), given paired-end samples with two ChIP replicates and two control replicates:
@@ -488,8 +485,8 @@ Below is an example of setting table file in its default-setting state:
 | <b>meme_chip | -meme-nmotifs 25 |
 
 As can be seen, certain flags and values for some programs have been preset as per our testing and opinions. A point to note however, some flags for programs, such as -BAMPE in MACS2, are not listed since they are “hard-coded” into the pipeline and cannot be modified. For this example of -BAMPE in MACS2, this is “hard-coded” because this flag is essential for running peak calling in paired-end datsets. Parameters and flags like this that must be set are “hard-coded” and hidden and cannot be changed unless by choosing the appropriate narrow/broad run modes. A listing of all these “hard-coded” parameters can be found in our [documentation](https://github.com/JSuryatenggara/ChIP-AP/wiki/ChIP-AP-Guide).
-<br>
 
+<br>
 
 ## ChIP vs Control fold change calculation
 For transcription factor samples (narrow peaks), ChIP weighted peak center coordinate is determined by the median coordinate of all reads in the peak region. Fold change was then calculated as read depth in ChIP sample divided by non-zero read depth of control sample at the weighted peak center coordinate.
@@ -508,6 +505,7 @@ Advanced users may choose to change this by changing the argument field for fold
     - change to all mapped reads
 - --normfactor user_value --chip_norm [x] --ctrl_norm [y] 
     - change to user-determined normalization factor, where x / y is the user-determined ratio of the number of ChIP reads to the number of control reads
+
 <br>
 
 ## Genrich p-value threshold adjustment formula
@@ -534,7 +532,6 @@ There are a couple of things to look for to answer this question. 1, the fingerp
     To interpret the fingerprint plot, (more information can be found on the deeptools documentation site), but  put simply, the input control should be a diagonal line as close as possible toward the 1:1 diagonal. Your ChIP sample should have a bend/kink towards the bottom right corner. The greater the separation between the input and the chip sample, the greater the enrichment you will see in the final result (i.e., lots of peaks). If the lines are overlapping, then you will see little enrichment and your experiment didn’t work that well. If you’re sample lines are switched – then you probably switched the sample names and we recommend doing the right thing and repeating the experiment and not simply switch sample names for the sake of a publication.
 
    In this example, there is reasonable enrichment in our chip samples. And so we are confident we can see enrichment.
-
 
 2. <b>The Venn Diagram (well Venn Text)</b>
 
