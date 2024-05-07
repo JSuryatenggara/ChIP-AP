@@ -179,6 +179,8 @@ ChIP-AP offers 2 graphical interfaces for running – depending on a users profi
 
 We recommend new users to ChIP-AP first use the wizard. Proficient users of ChIP-AP should use the dashboard as it enables inputting the data more quickly.
 
+<br>
+
 ### Running the Wizard
 Once ChIP-AP is setup, at the command line type: 
 
@@ -189,6 +191,8 @@ to use the wizard graphical user interface (GUI). The multiple windows that appe
 <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/chipap_wizard_guide.png>
 </p>
 
+<br>
+
 ### Running the Dashboard
 Once ChIP-AP is setup, at the command line type: 
 
@@ -198,6 +202,8 @@ The GUI below will appear enabling users to input everything required for a run.
 <p align="center">
 <img src=https://raw.githubusercontent.com/JSuryatenggara/ChIP-AP/storage/images/chipap_dashboard_guide.png>
 </p>
+
+<br>
 
 ### For advanced users
 A customized pipeline run is possible by providing the required flag arguments for each individual program in the pipeline at the * stage above. By selecting the right option, a secondary window will appear containing multiple entry fields for such flag arguments. This option is for advanced users only. For valid flags, please refer to the documentation of each program specifically as each program has different flags and syntax for its parameters.
