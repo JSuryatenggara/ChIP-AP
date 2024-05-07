@@ -80,7 +80,7 @@ Before continuing, you must close and re-open the terminal to initialize conda.
 
 4 - In a new terminal window, you should now see (base) written to the left of the command prompt, this tells you conda has been properly initialized.  If it hasn’t been initialized, refer to the [conda documentation](https://docs.anaconda.com/anaconda/user-guide/faq/#:~:text=In%20order%20to%20initialize%20after,and%20then%20run%20conda%20init%20.&text=Replace%20%3Cpath%2Dto%2Danaconda,of%20your%20installed%20Anaconda%20file.), section _"Should I add Anaconda to the macOS or Linux PATH?"_
 
-5 - Next navigate to the chipap_installation folder. Check that the chipap_installer.py script is executable (if not, run the command)
+5 - Next navigate to the chipap_installation folder. Check that the chipap_installer.py script is executable. If not, type the command:
 
 	chmod +x ./chipap_installer.py
 
