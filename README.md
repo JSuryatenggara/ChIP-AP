@@ -213,7 +213,7 @@ A customized pipeline run is possible by providing the required flag arguments f
 In each of these entry fields, user may key in the flag arguments as they are written for each corresponding program (e.g., “-q 20” for samtools view which will filter reads with a MAPQ > 20). This requires user to read dedicated official manuals to understand what and how these arguments can be given to the corresponding program in the pipeline. This, accompanied with the fact that bad/wrong flag arguments may break the pipeline run, shows that this manual customization of pipeline programs settings is recommended for experienced users only, and that inexperienced users should stick with the default settings or get a bioinformaticians input.
 
 <br>
-
+<br>
 
 ## ChIP-AP Graphical Overview
 <p align="center">
@@ -222,7 +222,7 @@ In each of these entry fields, user may key in the flag arguments as they are wr
 <b>For detailed explanations of all the steps and methodologies used throughout ChIP-AP refer to our documentation (https://github.com/JSuryatenggara/ChIP-AP/wiki/ChIP-AP-Guide)</b>
 
 <br>
-
+<br>
 
 ## Main Pipeline Output
 ### Final Analysis Table (including supplementary annotations)
