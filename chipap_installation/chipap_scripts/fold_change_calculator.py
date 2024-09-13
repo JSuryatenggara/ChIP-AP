@@ -460,35 +460,60 @@ if motif_number_column_exist == 0:
 
 
 # Determining all the columns wanted in the output table, and their orders
-peak_df = peak_df[['Peak ID', 
-                    'Chr', 
-                    'Start', 
-                    'End', 
-                    'Strand', 
-                    'Peak Caller Combination', 
-                    'Peak Caller Overlaps'
-                    ] + calculator_output_column_name + [
-                    'Number of Motifs', 
-                    'Annotation', 
-                    'Detailed Annotation', 
-                    'Distance to TSS', 
-                    'Nearest PromoterID', 
-                    'Entrez ID', 
-                    'Nearest Unigene', 
-                    'Nearest Refseq', 
-                    'Nearest Ensembl', 
-                    'Gene Name', 
-                    'Gene Alias', 
-                    'Gene Description', 
-                    'Gene Type', 
-                    'CpG%', 
-                    'GC%'
-                    ]]
+try:
+    peak_df = peak_df[['Peak ID', 
+                        'Chr', 
+                        'Start', 
+                        'End', 
+                        'Strand', 
+                        'Peak Caller Combination', 
+                        'Peak Caller Overlaps'
+                        ] + calculator_output_column_name + [
+                        'Number of Motifs', 
+                        'Annotation', 
+                        'Detailed Annotation', 
+                        'Distance to TSS', 
+                        'Nearest PromoterID', 
+                        'Entrez ID', 
+                        'Nearest Unigene', 
+                        'Nearest Refseq', 
+                        'Nearest Ensembl', 
+                        'Gene Name', 
+                        'Gene Alias', 
+                        'Gene Description', 
+                        'Gene Type', 
+                        'CpG%', 
+                        'GC%'
+                        ]]
+
+except:
+    peak_df = peak_df[['Peak ID', 
+                        'Chr', 
+                        'Start', 
+                        'End', 
+                        'Strand', 
+                        'Peak Caller Combination', 
+                        'Peak Caller Overlaps'
+                        ] + calculator_output_column_name + [
+                        'Number of Motifs', 
+                        'Annotation', 
+                        'Detailed Annotation', 
+                        'Distance to TSS', 
+                        'Nearest PromoterID', 
+                        'Entrez ID', 
+                        'Nearest Unigene', 
+                        'Nearest Refseq', 
+                        'Nearest Ensembl', 
+                        'Gene Name', 
+                        'Gene Alias', 
+                        'Gene Description', 
+                        'Gene Type'
+                        ]]
 
 # Fix the bug where pandas automatically adds one decimal point to all the numbers in the 'Entrez ID' column
 # Some entries in the 'Entrez ID' column are NaN. When pandas parse column containing numbers 
 #   with one or more NaNs, it automatically assigns all values into float type
-peak_df['Entrez ID'] = peak_df['Entrez ID'].fillna(0).astype('Int64')
+peak_df['Entrez ID'] = peak_df['Entrez ID'].fillna('')
 
 print('Writing the result to file {}'.format(output_tsv_full_path))
 # HOMER annotated peak list augmented with essential information regarding the 

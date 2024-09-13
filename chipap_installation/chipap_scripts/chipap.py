@@ -195,12 +195,12 @@ script_version = '5.4'
 from os.path import dirname as up
 import argparse
 import os
+import shutil
 import errno
 import math
 import multiprocessing
 import subprocess
 import numpy as np
-from shutil import which
 import pandas as pd
 import requests
 import pathlib
@@ -354,8 +354,7 @@ parser.add_argument('--motif',
                     help = '<Optional> Your predicted/known motif file, in HOMER matrix format, .motif extension')
 
 parser.add_argument('--ref', 
-                    help = '<Optional> Your sample organism genome reference build. Default is hg38 (human).', 
-                    choices = ['hg19', 'hg38', 'mm9', 'mm10', 'dm6', 'sacCer3'], 
+                    help = '<Optional> Your sample organism genome reference build. Default is hg38 (human).',  
                     default = 'hg38')
 
 parser.add_argument('--goann', 
@@ -419,19 +418,11 @@ if args.motif:
 if not args.motif:
     motif_file_full_path = None
 
+# List of genome reference readily supported by ChIP-AP
+supported_genome = ['hg19', 'hg38', 'mm9', 'mm10', 'dm6', 'sacCer3']
+
 # Reference genome to be used depending on sample organism. For now, the suite can take in human and mouse samples
-if args.ref == 'hg19':
-    genome_ref = 'hg19' # For human samples
-if args.ref == 'hg38':
-    genome_ref = 'hg38' # For human samples
-if args.ref == 'mm9':
-    genome_ref = 'mm9' # For mice samples
-if args.ref == 'mm10':
-    genome_ref = 'mm10' # For mice samples
-if args.ref == 'dm6':
-    genome_ref = 'dm6' # For fruitfly samples
-if args.ref == 'sacCer3':
-    genome_ref = 'sacCer3' # For yeast samples
+genome_ref = args.ref
 
 home_dir = os.path.expanduser('~') # Absolute path to the user's home directory
 root_dir = os.path.expanduser('/') # Absolute path to the root directory
@@ -476,22 +467,37 @@ for program in program_update_check_list:
     except:
         print('{} is no longer required in the latest implementation of ChIP-AP'.format(program.split('/')[-1]))
         continue
-            
-    if which(program) is None:
-        print(which(program))
-        print('WARNING: {} is not found in your local system'.format(program.split('/')[-1]))
-        continue
+
+    if program == 'default_settings_table.tsv':
+        custom_settings_table_full_path = os.path.abspath('{}/default_settings_table.tsv'.format(args.genome))
+        if not os.path.isfile(custom_settings_table_full_path):
+            print('WARNING: {} is not found in your local system'.format(program.split('/')[-1]))   
+    
+        else:
+            local_file = open(custom_settings_table_full_path, 'r')
+
+            if remote_file.text == local_file.read():
+                print('{} is up to date'.format(program.split('/')[-1]))
+
+            elif remote_file.text != local_file.read():
+                update_counter += 1
+                print('Newer version of {} is available on our github'.format(program.split('/')[-1]))
 
     else:
-        local_file = open(which(program), 'r')
+        if shutil.which(program) is None:
+            print('WARNING: {} is not found in your local system'.format(program.split('/')[-1]))
+            continue
 
-        if remote_file.text == local_file.read():
-            print('{} is up to date'.format(program.split('/')[-1]))
+        else:
+            local_file = open(shutil.which(program), 'r')
 
-        elif remote_file.text != local_file.read():
-            update_counter += 1
-            print('Newer version of {} is available on our github'.format(program.split('/')[-1]))
-            
+            if remote_file.text == local_file.read():
+                print('{} is up to date'.format(program.split('/')[-1]))
+
+            elif remote_file.text != local_file.read():
+                update_counter += 1
+                print('Newer version of {} is available on our github'.format(program.split('/')[-1]))
+                
 if update_counter == 0:
     print('\nYour ChIP-AP is up to date\n')
 
@@ -509,12 +515,12 @@ if update_counter > 0:
 # Source: https://deeptools.readthedocs.io/en/develop/content/feature/effectiveGenomeSize.html
 # sacCer3_effective_genome_size was manually calculated based on the number of non-N characters in the genome's FASTA file
 
-hg19_effective_genome_size = '2864785220'
-hg38_effective_genome_size = '2913022398'
-mm9_effective_genome_size = '2620345972'
-mm10_effective_genome_size = '2652783500'
-dm6_effective_genome_size = '142573017'
-sacCer3_effective_genome_size = '12071326' 
+hg19_effective_genome_size      = '2861327131'
+hg38_effective_genome_size      = '2937639113'
+mm9_effective_genome_size       = '2558509480'
+mm10_effective_genome_size      = '2647521431'
+dm6_effective_genome_size       = '137057575'
+sacCer3_effective_genome_size   = '12071326'
 
 if genome_ref == 'hg19':
     effective_genome_size = hg19_effective_genome_size
@@ -698,7 +704,7 @@ if '.bam' in chip_r1_original_extension and '.bam' in ctrl_r1_original_extension
     else:
         print('You cannot combine aligned read files (.bam) with raw read files (e.g. fastq)')
         print('Exiting program')
-        quit()
+        exit()
 else:
     start_from_bam = False
 
@@ -734,8 +740,26 @@ if args.custom_setting_table:
     custom_settings_table_full_path = os.path.abspath(args.custom_setting_table)
 
 if not args.custom_setting_table:
-    # If not provided, suite will read the default custom settings table, currently provided in the genome folder
-    custom_settings_table_full_path = os.path.abspath('{}/default_settings_table.tsv'.format(args.genome))
+    # If not provided, suite will parse the path to chipap installation directory
+    chipap_path_check = subprocess.Popen('which chipap.py', shell = True, stdout = subprocess.PIPE) # Get the full path to chipap.py
+    chipap_path = chipap_path_check.communicate()[0].decode('utf-8')
+    chipap_dir = '/'.join(chipap_path.split('/')[:-1])
+
+    # Then if the default custom settings table file is found in chipap installation directory, use it for the run
+    if os.path.isfile('{}/default_settings_table.tsv'.format(chipap_dir)):
+        print('Custom settings table not assigned. Using default settings as described in: {}/default_settings_table.tsv\n'.format(chipap_dir))
+        custom_settings_table_full_path = '{}/default_settings_table.tsv'.format(chipap_dir)
+
+    else:
+        if os.path.isfile('{}/default_settings_table.tsv'.format(args.genome)):
+            # Otherwise, check if the default custom settings table file is found in the genome directory, and then use it for the run
+            print('Custom settings table not assigned. Using default settings as described in: {}/default_settings_table.tsv\n'.format(args.genome))
+            custom_settings_table_full_path = os.path.abspath('{}/default_settings_table.tsv'.format(args.genome))
+
+        else:
+            # If not found in both directories above, send error message
+            print('Could not find default_settings_table.tsv in default paths. Please provide the path manually using --custom_setting_table flag')
+            exit()
 
 custom_settings_table_df        = pd.read_csv(custom_settings_table_full_path, delimiter='\t')
 custom_settings_table_df        = custom_settings_table_df.replace(np.nan, '', regex = True)
@@ -1090,6 +1114,23 @@ if peak_type == 'unsure':
 ### SUITE REQUIREMENTS CHECKPOINT
 ########################################################################################################################
 
+distribution_name_list = ['Anaconda', 'Anaconda2', 'Anaconda3', 'Miniconda', 'Miniconda2', 'Miniconda3', 'Miniforge', 'Miniforge2', 'Miniforge3']
+
+conda_file = shutil.which('conda') # Get the full path to conda executable
+
+if any(distribution_name in conda_file.split('/') for distribution_name in distribution_name_list):
+    for distribution_name in distribution_name_list:
+        if distribution_name in conda_file.split('/'):
+            conda_dir = '{}{}'.format(conda_file.split(distribution_name)[0], distribution_name) # Get the parent directory of the conda distribution
+            break
+
+elif any(distribution_name.lower() in conda_file.split('/') for distribution_name in distribution_name_list):
+    for distribution_name in distribution_name_list:
+        if distribution_name.lower() in conda_file.split('/'):
+            conda_dir = '{}{}'.format(conda_file.split(distribution_name.lower())[0], distribution_name.lower()) # Get the parent directory of the conda distribution
+            break
+
+
 print('Checking for suite requirements')
 # 0 for error_status means the suite is not lacking anything necessary and is good to go
 error_status = 0
@@ -1103,7 +1144,7 @@ error_status = 0
 # If any of the suite requirements is not met, it will set the error_status to 1 and 
 #   the script will print some troubleshooting instructions for the user
 
-if which('fastqc') is None:
+if shutil.which('fastqc') is None:
     print('Please make sure fastqc is installed, in PATH, and marked as executable')
     error_status = 1
 
@@ -1111,7 +1152,7 @@ if check_program('fastqc --help') is False:
     print('Pre-run test of fastqc failed. Please try running fastqc individually to check for the problem')
     error_status = 1
 
-if which('clumpify.sh') is None:
+if shutil.which('clumpify.sh') is None:
     print('Please make sure clumpify.sh is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1119,7 +1160,7 @@ if check_program('clumpify.sh') is False:
     print('Pre-run test of clumpify.sh failed. Please try running clumpify.sh individually to check for the problem')
     error_status = 1
 
-if which('bbduk.sh') is None:
+if shutil.which('bbduk.sh') is None:
     print('Please make sure bbduk.sh is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1127,20 +1168,23 @@ if check_program('bbduk.sh') is False:
     print('Pre-run test of bbduk.sh failed. Please try running bbduk.sh individually to check for the problem')
     error_status = 1
 
-# Try to look for trimmomatic in the home directory first
-trimmomatic_exist, trimmomatic_full_path = find_program('trimmomatic.jar', home_dir)
+# Try to look for trimmomatic in the conda directory first
+trimmomatic_exist, trimmomatic_full_path = find_program('trimmomatic.jar', conda_dir)
 if not trimmomatic_exist:
-    # If trimmomatic does not exist in the home directory, try looking in the root directory
-    trimmomatic_exist, trimmomatic_full_path = find_program('trimmomatic.jar', root_dir)
+    # If trimmomatic does not exist in the conda directory, try looking in the home directory
+    trimmomatic_exist, trimmomatic_full_path = find_program('trimmomatic.jar', home_dir)
     if not trimmomatic_exist:
-        print('Please make sure trimmomatic is installed in your computer')
-        error_status = 1
+        # If trimmomatic does not exist in the home directory, try looking in the root directory
+        trimmomatic_exist, trimmomatic_full_path = find_program('trimmomatic.jar', root_dir)
+        if not trimmomatic_exist:
+            print('Please make sure trimmomatic is installed in your computer')
+            error_status = 1
 
 if check_program('java -jar {}'.format(trimmomatic_full_path)) is False:
     print('Pre-run test of trimmomatic failed. Please try running trimmomatic individually to check for the problem')
     error_status = 1
 
-if which('bwa') is None:
+if shutil.which('bwa') is None:
     print('Please make sure bwa is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1148,7 +1192,7 @@ if check_program('bwa') is False:
     print('Pre-run test of bwa failed. Please try running bwa individually to check for the problem')
     error_status = 1
 
-if which('samtools') is None:
+if shutil.which('samtools') is None:
     print('Please make sure samtools is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1156,7 +1200,7 @@ if check_program('samtools') is False:
     print('Pre-run test of samtools failed. Please try running samtools individually to check for the problem')
     error_status = 1
 
-if which('bamCoverage') is None:
+if shutil.which('bamCoverage') is None:
     print('Please make sure deeptools is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1164,7 +1208,7 @@ if check_program('bamCoverage') is False:
     print('Pre-run test of bamCoverage failed. Please try running bamCoverage individually to check for the problem')
     error_status = 1
 
-if which('macs2') is None:
+if shutil.which('macs2') is None:
     print('Please make sure MACS2 is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1172,20 +1216,23 @@ if check_program('macs2') is False:
     print('Pre-run test of macs2 failed. Please try running macs2 individually to check for the problem')
     error_status = 1
 
-# Try to look for gem in the home directory first
-gem_exist, gem_full_path = find_program('gem.jar', home_dir)
+# Try to look for gem in the conda directory first
+gem_exist, gem_full_path = find_program('gem.jar', conda_dir)
 if not gem_exist:
-    # If gem does not exist in the home directory, try looking in the root directory
-    gem_exist, gem_full_path = find_program('gem.jar', root_dir)
+    # If gem does not exist in the conda directory, try looking in the home directory
+    gem_exist, gem_full_path = find_program('gem.jar', home_dir)
     if not gem_exist:
-        print('Please make sure gem is installed in your computer')
-        error_status = 1
+        # If gem does not exist in the home directory, try looking in the root directory
+        gem_exist, gem_full_path = find_program('gem.jar', root_dir)
+        if not gem_exist:
+            print('Please make sure gem is installed in your computer')
+            error_status = 1
 
 if check_program('java -jar {}'.format(gem_full_path)) is False:
     print('Pre-run test of gem failed. Please try running gem individually to check for the problem')
     error_status = 1
 
-if which('makeTagDirectory') is None:
+if shutil.which('makeTagDirectory') is None:
     print('Please make sure HOMER is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1193,7 +1240,7 @@ if check_program('makeTagDirectory') is False:
     print('Pre-run test of makeTagDirectory failed. Please try running HOMER makeTagDirectory individually to check for the problem')
     error_status = 1
 
-if which('findPeaks') is None:
+if shutil.which('findPeaks') is None:
     print('Please make sure HOMER is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1201,7 +1248,7 @@ if check_program('findPeaks') is False:
     print('Pre-run test of findPeaks failed. Please try running HOMER findPeaks individually to check for the problem')
     error_status = 1
 
-if which('Genrich') is None:
+if shutil.which('Genrich') is None:
     print('Please make sure Genrich is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1209,7 +1256,7 @@ if check_program('Genrich') is False:
     print('Pre-run test of Genrich failed. Please try running Genrich individually to check for the problem')
     error_status = 1
 
-if which('Genrich.py') is None:
+if shutil.which('Genrich.py') is None:
     print('Please make sure Genrich.py is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1217,7 +1264,7 @@ if check_program('Genrich.py') is False:
     print('Pre-run test of Genrich.py failed. Please try running Genrich.py individually to check for the problem')
     error_status = 1
 
-if which('mergePeaks') is None:
+if shutil.which('mergePeaks') is None:
     print('Please make sure HOMER is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1225,7 +1272,7 @@ if check_program('mergePeaks') is False:
     print('Pre-run test of mergePeaks failed. Please try running HOMER mergePeaks individually to check for the problem')
     error_status = 1
 
-if which('annotatePeaks.pl') is None:
+if shutil.which('annotatePeaks.pl') is None:
     print('Please make sure HOMER is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1233,7 +1280,7 @@ if check_program('annotatePeaks.pl') is False:
     print('Pre-run test of annotatePeaks.pl failed. Please try running HOMER annotatePeaks.pl individually to check for the problem')
     error_status = 1
 
-if which('fold_change_calculator.py') is None:
+if shutil.which('fold_change_calculator.py') is None:
     print('Please make sure fold_change_calculator.py is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1241,7 +1288,7 @@ if check_program('fold_change_calculator.py') is False:
     print('Pre-run test of fold_change_calculator.py failed. Please try running fold_change_calculator.py individually to check for the problem')
     error_status = 1
 
-if which('idr') is None:
+if shutil.which('idr') is None:
     print('Please make sure IDR is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1249,7 +1296,7 @@ if check_program('idr') is False:
     print('Pre-run test of IDR failed. Please try running IDR individually to check for the problem')
     error_status = 1
 
-if which('IDR_integrator.py') is None:
+if shutil.which('IDR_integrator.py') is None:
     print('Please make sure IDR_integrator.py is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1257,7 +1304,7 @@ if check_program('IDR_integrator.py') is False:
     print('Pre-run test of IDR_integrator.py failed. Please try running IDR_integrator.py individually to check for the problem')
     error_status = 1
 
-if which('peak_caller_stats_calculator.py') is None:
+if shutil.which('peak_caller_stats_calculator.py') is None:
     print('Please make sure peak_caller_stats_calculator.py is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1265,7 +1312,7 @@ if check_program('peak_caller_stats_calculator.py') is False:
     print('Pre-run test of peak_caller_stats_calculator.py failed. Please try running peak_caller_stats_calculator.py individually to check for the problem')
     error_status = 1
 
-if which('GO_annotator.py') is None:
+if shutil.which('GO_annotator.py') is None:
     print('Please make sure GO_annotator.py is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1273,7 +1320,7 @@ if check_program('GO_annotator.py') is False:
     print('Pre-run test of GO_annotator.py failed. Please try running GO_annotator.py individually to check for the problem')
     error_status = 1
 
-if which('pathway_annotator.py') is None:
+if shutil.which('pathway_annotator.py') is None:
     print('Please make sure pathway_annotator.py is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1281,7 +1328,7 @@ if check_program('pathway_annotator.py') is False:
     print('Pre-run test of pathway_annotator.py failed. Please try running pathway_annotator.py individually to check for the problem')
     error_status = 1
 
-if which('findMotifsGenome.pl') is None:
+if shutil.which('findMotifsGenome.pl') is None:
     print('Please make sure HOMER is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1289,7 +1336,7 @@ if check_program('findMotifsGenome.pl') is False:
     print('Pre-run test of findMotifsGenome.pl failed. Please try running HOMER findMotifsGenome.pl individually to check for the problem')
     error_status = 1
 
-if which('meme_sequence_extractor.py') is None:
+if shutil.which('meme_sequence_extractor.py') is None:
     print('Please make sure meme_sequence_extractor.py is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -1297,7 +1344,7 @@ if check_program('meme_sequence_extractor.py') is False:
     print('Pre-run test of meme_sequence_extractor.py failed. Please try running meme_sequence_extractor.py individually to check for the problem')
     error_status = 1
 
-if which('meme-chip') is None:
+if shutil.which('meme-chip') is None:
     print('Please make sure MEME is installed, in PATH, and marked as executable')
     error_status = 1 
 
@@ -2888,11 +2935,11 @@ if peak_type == 'narrow':
     # The -f BAM flag and argument is used to process single-end reads. 
     #   It tells MACS that the input .bam files consists of one directional reads. 
     if read_mode == 'single':
-        macs2_peak_calling_script.write('macs2 callpeak {} -f BAM -t {} -c {} -g {} --name {}_MACS2 --outdir {} 1> {}/logs/{}.MACS2.out 2> {}/logs/{}.MACS2.err\n\n'.format(
+        macs2_peak_calling_script.write('macs2 callpeak {} -f BAM -t {} -c {}{} --name {}_MACS2 --outdir {} 1> {}/logs/{}.MACS2.out 2> {}/logs/{}.MACS2.err\n\n'.format(
             macs2_callpeak_arg, 
             macs2_chip_string, 
             macs2_ctrl_string, 
-            effective_genome_size, 
+            ' -g {}'.format(effective_genome_size) if genome_ref in supported_genome else '', 
             dataset_name, 
             macs2_dir, 
             macs2_dir, 
@@ -2903,11 +2950,11 @@ if peak_type == 'narrow':
     # The -f BAMPE flag and argument is used to process paired-end reads. 
     #   It tells MACS that the input .bam files consists of pairs of two directional reads. 
     elif read_mode == 'paired':
-        macs2_peak_calling_script.write('macs2 callpeak {} -f BAMPE -t {} -c {} -g {} --name {}_MACS2 --outdir {} 1> {}/logs/{}.MACS2.out 2> {}/logs/{}.MACS2.err\n\n'.format(
+        macs2_peak_calling_script.write('macs2 callpeak {} -f BAMPE -t {} -c {}{} --name {}_MACS2 --outdir {} 1> {}/logs/{}.MACS2.out 2> {}/logs/{}.MACS2.err\n\n'.format(
             macs2_callpeak_arg, 
             macs2_chip_string, 
             macs2_ctrl_string, 
-            effective_genome_size, 
+            ' -g {}'.format(effective_genome_size) if genome_ref in supported_genome else '', 
             dataset_name, 
             macs2_dir, 
             macs2_dir, 
@@ -2924,11 +2971,11 @@ if peak_type == 'broad':
     # The -f BAM flag and argument is used to process single-end reads. 
     #   It tells MACS that the input .bam files consists of one directional reads. 
     if read_mode == 'single':
-        macs2_peak_calling_script.write('macs2 callpeak {} --broad -f BAM -t {} -c {} -g {} --name {}_MACS2 --outdir {} 1> {}/logs/{}.MACS2.out 2> {}/logs/{}.MACS2.err\n\n'.format(
+        macs2_peak_calling_script.write('macs2 callpeak {} --broad -f BAM -t {} -c {}{} --name {}_MACS2 --outdir {} 1> {}/logs/{}.MACS2.out 2> {}/logs/{}.MACS2.err\n\n'.format(
             macs2_callpeak_arg, 
             macs2_chip_string, 
             macs2_ctrl_string, 
-            effective_genome_size, 
+            ' -g {}'.format(effective_genome_size) if genome_ref in supported_genome else '', 
             dataset_name, 
             macs2_dir, 
             macs2_dir, 
@@ -2939,11 +2986,11 @@ if peak_type == 'broad':
     # The -f BAMPE flag and argument is used to process paired-end reads. 
     #   It tells MACS that the input .bam files consists of pairs of two directional reads. 
     elif read_mode == 'paired':
-        macs2_peak_calling_script.write('macs2 callpeak {} --broad -f BAMPE -t {} -c {} -g {} --name {}_MACS2 --outdir {} 1> {}/logs/{}.MACS2.out 2> {}/logs/{}.MACS2.err\n\n'.format(
+        macs2_peak_calling_script.write('macs2 callpeak {} --broad -f BAMPE -t {} -c {}{} --name {}_MACS2 --outdir {} 1> {}/logs/{}.MACS2.out 2> {}/logs/{}.MACS2.err\n\n'.format(
             macs2_callpeak_arg, 
             macs2_chip_string, 
             macs2_ctrl_string, 
-            effective_genome_size, 
+            ' -g {}'.format(effective_genome_size) if genome_ref in supported_genome else '', 
             dataset_name, 
             macs2_dir, 
             macs2_dir, 
@@ -2997,7 +3044,7 @@ if peak_type == 'narrow':
     # GEM peak caller harnesses the knowledge of the genomic sequence, which is why reference genome is required.
     # GEM peak caller is calling peaks while considering all the possible binding motifs, 
     #   thus it is required to set the range of motif length to be considered (k_min to k_max)
-    gem_peak_calling_script.write('java -jar {} {} --t {} --d {}/GEM/Read_Distribution_default.txt --g {}/GEM/{}.chrom.sizes --genome {}/GEM/{}_Chr_FASTA --s {} {} {} --f SAM --out {}/{}_GEM 1> {}/logs/{}.GEM.out 2> {}/logs/{}.GEM.err\n\n'.format(
+    gem_peak_calling_script.write('java -jar {} {} --t {} --d {}/GEM/Read_Distribution_default.txt --g {}/GEM/{}.chrom.sizes --genome {}/GEM/{}_Chr_FASTA{} {} {} --f SAM --out {}/{}_GEM 1> {}/logs/{}.GEM.out 2> {}/logs/{}.GEM.err\n\n'.format(
         gem_full_path, 
         gem_arg, 
         math.ceil(cpu_count/2), 
@@ -3006,7 +3053,7 @@ if peak_type == 'narrow':
         genome_ref, 
         genome_dir, 
         genome_ref, 
-        effective_genome_size,
+        ' --s {}'.format(effective_genome_size) if genome_ref in supported_genome else '',
         gem_chip_string, 
         gem_ctrl_string, 
         gem_dir, 
@@ -3139,10 +3186,10 @@ homer_peak_calling_script.write('wait\n\n')
 # Only when ChIP-AP is running in narrow peak mode (ChIP protein is a transcription factor)
 if peak_type == 'narrow':
 
-    homer_peak_calling_script.write('findPeaks {}/chip_tag_directory {} -style factor -gsize {} -o {}/{}_HOMER.peaks -i {}/ctrl_tag_directory 1> {}/logs/{}.HOMER.out 2> {}/logs/{}.HOMER.err\n\n'.format(
+    homer_peak_calling_script.write('findPeaks {}/chip_tag_directory {} -style factor{} -o {}/{}_HOMER.peaks -i {}/ctrl_tag_directory 1> {}/logs/{}.HOMER.out 2> {}/logs/{}.HOMER.err\n\n'.format(
         homer_dir, 
         homer_findPeaks_arg, 
-        effective_genome_size,
+        ' -gsize {}'.format(effective_genome_size) if genome_ref in supported_genome else '',
         homer_dir, 
         dataset_name, 
         homer_dir, 
@@ -3157,10 +3204,10 @@ if peak_type == 'narrow':
 # Only when ChIP-AP is running in broad peak mode (ChIP protein is a histone modifier)
 if peak_type == 'broad':
 
-    homer_peak_calling_script.write('findPeaks {}/chip_tag_directory {} -style histone -gsize {} -o {}/{}_HOMER.peaks -i {}/ctrl_tag_directory 1> {}/logs/{}.HOMER.out 2> {}/logs/{}.HOMER.err\n\n'.format(
+    homer_peak_calling_script.write('findPeaks {}/chip_tag_directory {} -style histone{} -o {}/{}_HOMER.peaks -i {}/ctrl_tag_directory 1> {}/logs/{}.HOMER.out 2> {}/logs/{}.HOMER.err\n\n'.format(
         homer_dir, 
         homer_findPeaks_arg, 
-        effective_genome_size,
+        ' -gsize {}'.format(effective_genome_size) if genome_ref in supported_genome else '',
         homer_dir, 
         dataset_name, 
         homer_dir, 
@@ -3274,6 +3321,11 @@ chromosomes_df.sort_values(by = [0], inplace = True)
 chromosomes_list = chromosomes_df[0].values.tolist()
 chromosomes_string = '\|'.join(chromosomes_list)
 
+if all('chr' in chromosome for chromosome in chromosomes_list):
+    chr_format = 1
+else:
+    chr_format = 0
+
 
 
 # Commands to extract peak locations from peak caller output of MACS2 (narrow peak mode), GEM, HOMER (factor peak mode), and Genrich
@@ -3296,7 +3348,10 @@ if peak_type == 'narrow':
     peaks_merging_script.write(' | tail -n +2') # Throw out the headers
     peaks_merging_script.write(' | sort -k 4 -n -r') # Run reversed (-r) numerical (-n) sort by the fold change (column 4), causing the list to start with peaks with highest fold change
     peaks_merging_script.write(' | head -200000') # Take the 100,000 peaks with highest fold change. Anomalies happen sometimes where a peak caller calls 1,000,000+ peaks.
-    peaks_merging_script.write(r""" | awk '{split($1,a,":"); OFS="\t"; print "chr"a[1],a[2]-25,a[2]+25}'""") # Get the 1 bp coordinate generated by GEM. Extend it left and right to 50 bp.
+    if chr_format == 0:
+        peaks_merging_script.write(r""" | awk '{split($1,a,":"); OFS="\t"; print a[1],a[2]-25,a[2]+25}'""") # Get the 1 bp coordinate generated by GEM. Extend it left and right to 50 bp.
+    else:
+        peaks_merging_script.write(r""" | awk '{split($1,a,":"); OFS="\t"; print "chr"a[1],a[2]-25,a[2]+25}'""") # Get the 1 bp coordinate generated by GEM. Extend it left and right to 50 bp.
     peaks_merging_script.write(r""" | awk '{OFS="\t";print $1":"$2"-"$3,$1,$2,$3,"+"}'""") # Make it into HOMER format (chr:start-end \t chr \t start \t end \t strand)
     peaks_merging_script.write(" | grep -w '{}'".format(chromosomes_string)) # Filter out chr_alt, chr_fix, chrN_random, chrUn, and chrM
     peaks_merging_script.write(' > {}/GEM'.format(peaks_merging_dir)) # Save it under a short name (as to not generate mergePeaks output filename too long)
@@ -3439,12 +3494,12 @@ peaks_processing_script.write('cat {}/*{}_merged_peaks* | grep -v name > {}/{}_a
     dataset_name))
 
 # Bash commands to call HOMER annotatePeaks.pl to append gene annotations to each peak
-peaks_processing_script.write('annotatePeaks.pl {} {}/{}_all_peaks_concatenated.tsv {} -m {} -nmotifs -matrix {}/{} -go {}/{}_gene_ontology > {}/{}_all_peaks_annotated.tsv\n\n'.format(
+peaks_processing_script.write('annotatePeaks.pl {} {}/{}_all_peaks_concatenated.tsv {}{} -nmotifs -matrix {}/{} -go {}/{}_gene_ontology > {}/{}_all_peaks_annotated.tsv\n\n'.format(
     homer_annotatePeaks_arg,
     peaks_processing_dir, 
     dataset_name, 
-    genome_ref, 
-    motif_file_full_path, 
+    genome_ref,
+    ' -m {}'.format(motif_file_full_path) if motif_file_full_path != None else '', 
     peaks_processing_dir, 
     dataset_name, 
     peaks_processing_dir, 
@@ -3829,7 +3884,7 @@ if peak_type == 'narrow':
     # Bash commands to call HOMER findMotifsGenome.pl to perform motif enrichment analysis based on ChIP-AP consensus peak set. One command, one run for every one replicate.
     homer_motif_enrichment_consensus_script.write('findMotifsGenome.pl {}/consensus_peaks.tsv {} {} -p {} {} -dumpFasta 1> {}/logs/{}.HOMERmotifenrichment_consensus.out 2> {}/logs/{}.HOMERmotifenrichment_consensus.err\n\n'.format(
         homer_motif_enrichment_consensus_dir,
-        genome_ref, 
+        genome_ref,
         homer_motif_enrichment_consensus_dir, 
         cpu_count,
         homer_findMotifsGenome_arg,
@@ -3858,7 +3913,7 @@ if peak_type == 'narrow':
     # Bash commands to call HOMER findMotifsGenome.pl to perform motif enrichment analysis based on ChIP-AP union peak set. One command, one run for every one replicate.
     homer_motif_enrichment_union_script.write('findMotifsGenome.pl {}/union_peaks.tsv {} {} -p {} {} -dumpFasta 1> {}/logs/{}.HOMERmotifenrichment_union.out 2> {}/logs/{}.HOMERmotifenrichment_union.err\n\n'.format(
         homer_motif_enrichment_union_dir,
-        genome_ref, 
+        genome_ref,
         homer_motif_enrichment_union_dir, 
         cpu_count,
         homer_findMotifsGenome_arg,
@@ -4022,7 +4077,7 @@ if start_from_bam == False:
     master_script.write('echo Running quality check on the preprocessed sequencing reads.\n')
     master_script.write('{}\n\n'.format(preprocessed_reads_quality_control_script_name))
 
-    master_script.write('echo Aligning the paired-ends sequenced reads to {} using bwa mem algorithm\n'.format(genome_ref))
+    master_script.write('echo Aligning the {}-end sequenced reads to {} using bwa mem algorithm\n'.format(read_mode, genome_ref))
     master_script.write('{}\n\n'.format(bwa_mem_aligning_script_name))
 
     master_script.write('echo Filtering the aligned reads according to MAPQ score\n')

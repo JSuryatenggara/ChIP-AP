@@ -22,7 +22,7 @@ chipap_program_name = 'chipap.py'
 chipap_icon_full_path = os.path.expanduser('{}/ChIP-AP_icon_GUI.png'.format(sys.path[0])) # Path to ChIP-AP mini icon (png)
 chipap_logo_full_path = os.path.expanduser('{}/ChIP-AP_logo_GUI.jpg'.format(sys.path[0])) # Path to ChIP-AP full logo (jpeg)
 default_current_dir = os.path.expanduser('~') # Default starting directory for when user choose to browse
-genome_folder_full_path = os.path.expanduser('~/genomes') # Path to the default genome folder
+genome_folder_full_path = '/home/js/tools/ChIP-AP/chipap_installation/genomes'
 default_setting_table_file_full_path = '{}/default_settings_table.tsv'.format(genome_folder_full_path) # Path to the default setting table
 
 # Create a non-manually-resizable GUI base frame (root)
@@ -1070,7 +1070,7 @@ def update_command_line_function(*args):
     if not bool(setname_string_var.get()): # If the dataset name variable value is empty
         setname_arg.set('') # Empty the dataset name argument for the command line
 
-    output_dir_arg.set('{}/{}'.format(os.path.abspath(output_folder_string_var.get()), setname_string_var.get())) # All results are actually saved in [output folder]/[dataset name]
+    output_dir_arg.set('{}/{}'.format(output_folder_string_var.get(), setname_string_var.get())) # All results are actually saved in [output folder]/[dataset name]
 
     if bool(genome_ref_string_var.get()): # If the reference genome build variable value is not empty
         genome_ref_arg.set(' --ref {}'.format(genome_ref_string_var.get().split(' ')[0])) # Assign the reference genome build argument for the command line behind the corresponding flag
@@ -1176,9 +1176,9 @@ def check_traced_input_function(*args):
 def sample_table_entry_trace_load_function(*args):
     if bool(sample_table_string_var.get()): # If the sample table variable value is not empty
         if not os.path.isfile(sample_table_string_var.get()): # If the entered path leads to a non-existent file
+            clear_sample_function('valuesonly') # Clear all ChIP and control samples variable values, but not the sample table variable value
             sample_table_notification_string_var.set('Sample table not found') # Notify the user
             sample_table_notification_label.config(fg = 'red')
-            clear_sample_function('valuesonly') # Clear all ChIP and control samples variable values, but not the sample table variable value
         elif os.path.isfile(sample_table_string_var.get()): # If the entered path leads to an existing file
             sample_table_loading_test_function() # Load the sample table normally, as in when using the file browser via button click
 
@@ -1404,7 +1404,7 @@ single_end_radio.grid(row = 2, column = 11, columnspan = 4, padx = 10)
 # Radio button of the second choice that triggers a function when activated
 paired_end_radio = tk.Radiobutton(root, text = "Paired end", padx = 10, variable = read_mode_string_var, value = 'paired', width = 30, command = lambda : sample_button_switch_function())
 CreateToolTip(paired_end_radio, text = 'Select this if there are two\noutput files per sample.\nThey are typically in pairs:\nR1 and R2 for every sample')
-paired_end_radio.grid(row = 3, column = 11, columnspan = 4, padx = 10, pady = (0,5))
+paired_end_radio.grid(row = 3, column = 11, columnspan = 4, padx = 10)
 
 
 ########################################################################################################################
@@ -1475,6 +1475,13 @@ def sample_table_button_function():
 
 # Function to test whether the sample table is valid and its contents can be loaded properly without any error
 def sample_table_loading_test_function():
+
+    chip_r1_sample_list = []
+    ctrl_r1_sample_list = []
+    chip_r2_sample_list = []
+    ctrl_r2_sample_list = []
+    clear_sample_function('valuesonly') # Clear all sample-related variables
+
     try: # Try to load the sample table with pd.read_csv
         sample_table_absolute_path = sample_table_string_var.get()
         sample_table_df = pd.read_csv(sample_table_absolute_path, delimiter='\t')
@@ -1611,6 +1618,9 @@ def clear_sample_function(clear_sample_function_arg):
     ctrl_rep4_r2_string_var.set('')
     ctrl_rep5_r1_string_var.set('')
     ctrl_rep5_r2_string_var.set('')
+
+    sample_table_notification_string_var.set('Please load sample table or assign samples manually below')
+    sample_table_notification_label.config(fg = 'blue')
 
     rearrange_entry_field_function() # Rearrange the entry fields such that they always display the last n characters of entered path
 
@@ -2416,12 +2426,13 @@ setname_entry.grid(sticky = "we", row = 43, column = 2, columnspan = 4, ipady = 
 
 # Simple label with static text
 homer_motif_label = tk.Label(root, text = "HOMER motif enrichment:", anchor = "w")
+homer_motif_label.config(fg = 'grey60')
 homer_motif_label.grid(row = 35, column = 7, padx = 5, columnspan = 5, sticky = "sw", pady = (5,0))
 
 # Drop-down options widget that triggers a function when an option is chosen
 homer_motif_drop_down = tk.OptionMenu(root, homer_motif_string_var, *homer_motif_options)
 CreateToolTip(homer_motif_drop_down, text = 'Select the peak set(s) you want\nHOMER findMotifsGenome to perform\nmotif enrichment analysis on')
-homer_motif_drop_down.config(takefocus = 1)
+homer_motif_drop_down.config(takefocus = 1, state = tk.DISABLED)
 homer_motif_drop_down.grid(sticky = "we", row = 37, column = 7, padx = 5, columnspan = 5)
 
 
@@ -2430,12 +2441,13 @@ homer_motif_drop_down.grid(sticky = "we", row = 37, column = 7, padx = 5, column
 
 # Simple label with static text
 meme_motif_label = tk.Label(root, text = "MEME motif enrichment:", anchor = "w")
+meme_motif_label.config(fg = 'grey60')
 meme_motif_label.grid(row = 39, column = 7, padx = 5, columnspan = 5, sticky = "sw")
 
 # Drop-down options widget that triggers a function when an option is chosen
 meme_motif_drop_down = tk.OptionMenu(root, meme_motif_string_var, *meme_motif_options)
 CreateToolTip(meme_motif_drop_down, text = 'Select the peak set(s) you\nwant meme-chip to perform\nmotif enrichment analysis on')
-meme_motif_drop_down.config(takefocus = 1)
+meme_motif_drop_down.config(takefocus = 1, state = tk.DISABLED)
 meme_motif_drop_down.grid(sticky = "we", row = 41, column = 7, padx = 5, columnspan = 5)
 
 

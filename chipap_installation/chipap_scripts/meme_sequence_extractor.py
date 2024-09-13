@@ -24,6 +24,7 @@ script_version = '1.1'
 #                   - Lowercase characters from the standard version of the reference genome (soft-masked) are now automatically converted to N
 
 
+from email import header
 import pysam
 import argparse
 import pandas as pd
@@ -43,8 +44,12 @@ print('\nParsing command line flags and arguments...')
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--input',
-                    help = '<Required> Your fold-change-calculated peak list (ChIP-AP: dataset_name_all_peaks_calculated.tsv)',
+                    help = '<Required> Your fold-change-calculated peak list (default; ChIP-AP: dataset_name_all_peaks_calculated.tsv).',
                     required = True)
+
+parser.add_argument('--bed3',
+                    help = '<Optional> Use this flag if your input is not a ChIP-AP standard output. chr, start, and end column numbers are required to be given as arguments (space-separated; e.g., "--bed3 1 2 3" for basic BED3 columns arrangement.)',
+                    nargs = '+')
 
 parser.add_argument('--fastadir', 
                     help = '<Required> Your reference genome FASTA file folder.', 
@@ -55,8 +60,7 @@ parser.add_argument('--chrsizedir',
                     required = True)
 
 parser.add_argument('--ref', 
-                    help = '<Optional> Your sample organism reference genome build.', 
-                    choices = ['hg19', 'hg38', 'mm9', 'mm10', 'dm6', 'sacCer3'],
+                    help = '<Required> Your sample organism reference genome build.', 
                     required = True)
 
 parser.add_argument('--filter', 
@@ -188,11 +192,20 @@ genome_pysam = pysam.Fastafile(fasta_full_path)
 chr_size_df = pd.read_csv(chr_size_full_path, delimiter = '\t', header = None)
 chr_size_dict = dict(chr_size_df.values)
 
-# Read the peak list (dataset_name_all_peaks_calculated.tsv)
-input_df = pd.read_csv(input_full_path, delimiter = '\t')
-input_array = input_df.values.tolist()
-input_header = input_df.columns.tolist()
+if not args.bed3: # if the given input is ChIP-AP's output: dataset_name_all_peaks_calculated.tsv
+    # Read the peak list (dataset_name_all_peaks_calculated.tsv)
+    input_df = pd.read_csv(input_full_path, delimiter = '\t')
+    input_array = input_df.values.tolist()
+    input_header = input_df.columns.tolist()
 
+if args.bed3: # if the given input is bed file with only chr-start-end columns
+    print('Non ChIP-AP input format is used. The program will return an error if user-provided chr, start, end columns are faulty.')
+    # Read the peak list (bed file with only chr-start-end columns)
+    if len(args.bed3) != 3:
+        print('3 values for the columns: chr, start, end need to be given (space-separated) if you are using the --bed3 flag. Exiting program.')
+        exit()
+    input_df = pd.read_csv(input_full_path, delimiter = '\t', header = None)
+    input_array = input_df.values.tolist()
 
 # Prepare lists for the initial target sequences
 filtered_input_array = []
@@ -203,31 +216,41 @@ center_column_number_list = []
 
 print('\nReading the peak list to generate initial target sequences...')
 
-# Parse the given peak list and find the relevant columns' index number by header values
-for input_header_counter in range(len(input_header)):
-    if input_header[input_header_counter] == 'Chr':
-        chr_column_number = input_header_counter
+if not args.bed3: # if the given input is ChIP-AP's output: dataset_name_all_peaks_calculated.tsv
+    # Parse the given peak list and find the relevant columns' index number by header values
+    for input_header_counter in range(len(input_header)):
+        if input_header[input_header_counter] == 'Chr':
+            chr_column_number = input_header_counter
 
-    if input_header[input_header_counter] == 'Start':
-        start_column_number = input_header_counter
+        if input_header[input_header_counter] == 'Start':
+            start_column_number = input_header_counter
 
-    if input_header[input_header_counter] == 'End':
-        end_column_number = input_header_counter
+        if input_header[input_header_counter] == 'End':
+            end_column_number = input_header_counter
 
-    if 'Peak Center' in input_header[input_header_counter]: # Parses multiple weighted peak center columns, if exist
-        center_column_number_list.append(input_header_counter)
+        if 'Peak Center' in input_header[input_header_counter]: # Parses multiple weighted peak center columns, if exist
+            center_column_number_list.append(input_header_counter)
 
-    if input_header[input_header_counter] == 'Peak Caller Combination':
-        peak_caller_combination_column_number = input_header_counter
+        if input_header[input_header_counter] == 'Peak Caller Combination':
+            peak_caller_combination_column_number = input_header_counter
 
-    if input_header[input_header_counter] == 'Peak Caller Overlaps':
-        peak_caller_overlap_column_number = input_header_counter
+        if input_header[input_header_counter] == 'Peak Caller Overlaps':
+            peak_caller_overlap_column_number = input_header_counter
 
+if args.bed3: # if the given input is bed file with only chr-start-end columns
+    chr_column_number = int(args.bed3[0]) - 1
+    print('User-provided chr column number is {}'.format(chr_column_number + 1))
+    start_column_number = int(args.bed3[1]) - 1
+    print('User-provided start column number is {}'.format(start_column_number + 1))
+    end_column_number = int(args.bed3[2]) - 1
+    print('User-provided end column number is {}'.format(end_column_number + 1))
 
 # Set the number of replicates based on how many weighted peak center columns in the peak list if sequences are to be resized 
 #   (Sequence padding = multi-replicated weighted peak centers = multi-replicated motif enrichment analysis)
 if args.background or args.length != 'auto': # Resizing scenario
     replicate_number = len(center_column_number_list)
+    if replicate_number < 1: # In case the input data does not have a peak center column
+        replicate_number = 1 # Replicate number cannot be zero
 
 # Set the number of replicates to 1 if target sequences are kept at their initial length
 #   (No sequence padding = multi-replicated weighted peak centers irrelevant)
@@ -235,17 +258,20 @@ else: # No resizing scenario
     replicate_number = 1
 
 
-print('\nSelecting peaks based on user-determined filter...')
+if not args.bed3: # if the given input is ChIP-AP's output: dataset_name_all_peaks_calculated.tsv
+    print('\nSelecting peaks based on user-determined filter...')
+    if type(peakset_filter) == int: # If --filter is number of peak caller overlaps
+        for input_array_row in input_array:
+            if input_array_row[peak_caller_overlap_column_number] >= peakset_filter: # Get only peaks with number of overlaps equal or greater than the value of the filter
+                filtered_input_array.append(input_array_row)
 
-if type(peakset_filter) == int: # If --filter is number of peak caller overlaps
-    for input_array_row in input_array:
-        if input_array_row[peak_caller_overlap_column_number] >= peakset_filter: # Get only peaks with number of overlaps equal or greater than the value of the filter
-            filtered_input_array.append(input_array_row)
+    if type(peakset_filter) == str: # If --filter is peak caller name
+        for input_array_row in input_array:
+            if peakset_filter in input_array_row[peak_caller_combination_column_number]: # Get only peaks containing a substring equal to the value of the filter
+                filtered_input_array.append(input_array_row)
 
-if type(peakset_filter) == str: # If --filter is peak caller name
-    for input_array_row in input_array:
-        if peakset_filter in input_array_row[peak_caller_combination_column_number]: # Get only peaks containing a substring equal to the value of the filter
-            filtered_input_array.append(input_array_row)
+if args.bed3: # if the given input is bed file with only chr-start-end columns
+    filtered_input_array = input_array
 
 if len(filtered_input_array) == 0: # If filtering fails and ends up selecting no peak at all
     print('\nSelected peak set does not contain any peak. Please re-select your peak set with --filter or re-check the input peak list given with --input') # "Check again", then exit
@@ -257,12 +283,33 @@ if len(filtered_input_array) == 0: # If filtering fails and ends up selecting no
 
 print('\nReading the selected peaks to generate the initial target sequences...')
 
+header_leak_error = 0
+
 # Reading the filtered peak list to generate the initial target sequences
 for filtered_input_array_row in filtered_input_array:
+
+    try:
+        int(filtered_input_array_row[start_column_number])
+
+    except:
+        if header_leak_error == 0:
+            print('Header row detected in data array. One row of header is normal and can be ignored.')
+            header_leak_error += 1
+            continue
+        
+        if header_leak_error > 0:
+            print('Another header row seems to be detected. Likely the user-provided column numbers do not match the input data. Please check your input data. Exiting program.')
+            exit()
+
     chr = filtered_input_array_row[chr_column_number]
     start = int(filtered_input_array_row[start_column_number])
     end = int(filtered_input_array_row[end_column_number])
-    center_list = filtered_input_array_row[(np.min(np.array(center_column_number_list))) : (np.max(np.array(center_column_number_list)) + 1)] # Contains multiple values if exist.
+
+    if len(center_column_number_list) > 0: # If peak center column exists in the input file
+        center_list = filtered_input_array_row[(np.min(np.array(center_column_number_list))) : (np.max(np.array(center_column_number_list)) + 1)] # Contains multiple values if exist.
+
+    if len(center_column_number_list) == 0: # If peak center column does not exist in the input file
+        center_list = [start + int((end - start) / 2)] # Take the middle coordinate between peak start and peak end as the peak center
 
     sequence = genome_pysam.fetch(chr, start, end) # Use the pysam object defined in the beginning to rapidly access and read the sequence
     
@@ -290,8 +337,8 @@ for filtered_input_array_row in filtered_input_array:
 target_sequence_number = len(target_info_list) # Get the initial number of target sequences
 print('\nInitial number of target sequences: {}'.format(target_sequence_number)) # Let user know the initial number of target sequences 
 
-mean_target_length = int(np.mean(np.array(target_length_list))) # Get the mean initial length of target sequences 
-print('\nMean length of target sequences: {}'.format(mean_target_length)) # Let user know the mean initial length of target sequences 
+mean_target_length = round(np.mean(np.array(target_length_list))) # Get the mean initial length of target sequences 
+print('\nMean length of target sequences: {}'.format(mean_target_length)) # Let user know the mean initial length of target sequences
 
 
 ########################################################################################################################
@@ -300,7 +347,7 @@ print('\nMean length of target sequences: {}'.format(mean_target_length)) # Let 
 print('\nSampling the initial target sequences...')
 
 if 'x' in args.target_sampling: # If background sampling is a multiple of initial number, let the user know the effects of given target sampling value
-    sampled_target_sequence_number = int(target_sequence_number * target_sampling_multiplier)
+    sampled_target_sequence_number = round(target_sequence_number * target_sampling_multiplier)
 
     if target_sampling_multiplier == 1:
         print('\n--target_sampling {}. Sampling multiplier is equal to 1'.format(args.target_sampling))
@@ -346,6 +393,7 @@ if args.length == 'auto' and not args.background: # No resizing scenario
 
         resized_target_info_list.append([resized_chr_list, resized_start_list, resized_end_list, resized_sequence_list, resized_center_list]) # Stack this peak info
 
+    resized_target_length = 'No resizing'
 
 if args.length == 'auto' and args.background: # Automatic resizing scenario 
     resized_target_length = mean_target_length
@@ -512,7 +560,7 @@ print('\nSetting the number of background sequences...')
 if args.background:
 
     if 'x' in args.background_sampling:
-        background_sequence_number = int(sampled_target_sequence_number * background_sampling_multiplier)
+        background_sequence_number = round(sampled_target_sequence_number * background_sampling_multiplier)
         
         if background_sampling_multiplier > 1:
             print('\n--background_sampling {}. Number of target sequences has been upsampled by a factor of {} to {}'.format(args.background_sampling, background_sampling_multiplier, background_sequence_number))
@@ -564,11 +612,11 @@ if args.background:
 
         resized_target_total_all_N_instances = resized_target_total_all_N_instances_list[replicate_counter] # Get the number of 100% N target sequences of current replicate
         # Sets the limit so the number of generated 100% N background sequences in current replicate does not exceed those in target sequences
-        background_total_all_N_instances_limit = int(resized_target_total_all_N_instances * (background_sequence_number / sampled_target_sequence_number))
+        background_total_all_N_instances_limit = round(resized_target_total_all_N_instances * (background_sequence_number / sampled_target_sequence_number))
 
         resized_target_total_half_N_instances = resized_target_total_half_N_instances_list[replicate_counter] # Get the number of 50% < % of N < 100% target sequences of current replicate
         # Sets the limit so the number of generated 50% < % of N < 100% background sequences in current replicate does not exceed those in target sequences
-        background_total_half_N_instances_limit = int(resized_target_total_half_N_instances * (background_sequence_number / sampled_target_sequence_number))
+        background_total_half_N_instances_limit = round(resized_target_total_half_N_instances * (background_sequence_number / sampled_target_sequence_number))
 
 
         print('\nGenerating background sequences for target sequences replicate {}...'.format(replicate_counter + 1))

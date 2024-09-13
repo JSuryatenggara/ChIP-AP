@@ -21,7 +21,7 @@ chipap_program_name = 'chipap.py'
 chipap_icon_full_path = os.path.expanduser('{}/ChIP-AP_icon_GUI.png'.format(sys.path[0])) # Path to ChIP-AP mini icon (png)
 chipap_logo_full_path = os.path.expanduser('{}/ChIP-AP_logo_GUI.jpg'.format(sys.path[0])) # Path to ChIP-AP full logo (jpeg)
 default_current_dir = os.path.expanduser('~') # Default starting directory for when user choose to browse
-genome_folder_full_path = os.path.expanduser('~/genomes') # Path to the default genome folder
+genome_folder_full_path = '/home/js/tools/ChIP-AP/chipap_installation/genomes'
 default_setting_table_file_full_path = '{}/default_settings_table.tsv'.format(genome_folder_full_path) # Path to the default setting table)
 
 # Create a non-manually-resizable GUI base frame (root)

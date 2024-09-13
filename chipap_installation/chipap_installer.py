@@ -40,32 +40,41 @@ def replace_path(input_file, old_string, new_string):
     writing_file.close()
 
 
+distribution_name_list = ['Anaconda', 'Anaconda2', 'Anaconda3', 'Miniconda', 'Miniconda2', 'Miniconda3', 'Miniforge', 'Miniforge2', 'Miniforge3']
+
 conda_file = shutil.which('conda') # Get the full path to conda executable
 
-if 'anaconda3' in conda_file.split('/'):
-    conda_dir = '{}/anaconda3'.format(conda_file.split('/anaconda3/')[0]) # Get the parent directory of anaconda 3
+
+if any(distribution_name in conda_file.split('/') for distribution_name in distribution_name_list):
+    for distribution_name in distribution_name_list:
+        if distribution_name in conda_file.split('/'):
+            conda_dir = '{}{}'.format(conda_file.split(distribution_name)[0], distribution_name) # Get the parent directory of the conda distribution
+            break
+
+elif any(distribution_name.lower() in conda_file.split('/') for distribution_name in distribution_name_list):
+    for distribution_name in distribution_name_list:
+        if distribution_name.lower() in conda_file.split('/'):
+            conda_dir = '{}{}'.format(conda_file.split(distribution_name.lower())[0], distribution_name.lower()) # Get the parent directory of the conda distribution
+            break
 
 else:
-    conda_dir = '/'.join(conda_file.split('/')[0:(conda_file.split('/').index('bin'))])
+    while True: # Infinite loop until broken by user action
+        user_conda = input('Installer could not identify anaconda parent directory. \
+            Your Anaconda / Miniconda / Miniforge installation probably has a different parent directory name. \
+            To continue, please type in the full path to the parent directory (e.g., "/home/username/Anaconda3"). \
+            The sure way to do this is to call "which conda" or "where conda" in your terminal, and copy and paste the output down to the parent directory \
+            (e.g., if "which conda" or "where conda" output = "/home/username/Anaconda3/bin/conda", then paste in "/home/username/Anaconda3".')
 
-    if conda_dir + '/bin/conda' != conda_file:   
+        if user_conda.split('/') in conda_file.split('/'):
+            conda_dir = user_conda
+            print('Anaconda / Miniconda / Miniforge distribution directory confirmed. Continuing installation.')
+            break
 
-        while True: # Infinite loop until broken by user action
-            user_conda = input('Installer could not identify anaconda parent directory. \
-                Your anaconda installation probably has a different parent directory name. \
-                To continue, please type in the full path to your anaconda parent directory (e.g., "/home/username/Anaconda"). \
-                The more sure way to do this is to call "which conda" in your terminal, and copy and paste the output up to the anaconda parent directory \
-                (e.g., if "which conda" output = "/home/username/Anaconda/bin/conda", then paste in "/home/username/Anaconda".')
+        else:
+            print('Anaconda / Miniconda / Miniforge distribution directory is incorrect or not found. Please try again.') # Prompt them to try again
 
-            if user_conda.split('/') in conda_file.split('/'):
-                conda_dir = user_conda
-                print('Anaconda directory confirmed. Continuing installation.')
-                break
+print('Anaconda / Miniconda / Miniforge directory is {}'.format(conda_dir))
 
-            else:
-                print('Anaconda directory is incorrect or not found. Please try again.') # Prompt them to try again
-
-print('Anaconda directory is {}'.format(conda_dir))
 
 while True: # Infinite loop until broken by user action
     user_answer = input('Do you want to install ChIP-AP in a specific environment? (Y/N) ') # Proceed only after the user provided Y or N answer to this question
@@ -78,8 +87,8 @@ while True: # Infinite loop until broken by user action
         input('ChIP-AP will be installed in {} environment. Press ENTER to continue'.format(user_environment)) # Notify the user
         break # Dialogue finished. Proceed with the installation.
 
-    if user_answer.lower() == 'n': # If user is installing ChIP-AP in the base environment (where Anaconda 3 is installed)
-        user_environment = 'base' # The default name of the environment where Anaconda 3 is installed
+    if user_answer.lower() == 'n': # If user is installing ChIP-AP in the base environment (where Anaconda / Miniconda / Miniforge is installed)
+        user_environment = 'base' # The default name of the environment where Anaconda / Miniconda / Miniforge is installed
         chipap_env_dir = '{}'.format(conda_dir)
         prefix_string = 'prefix: {}'.format(chipap_env_dir) # Path to the directory in which the newly created environment components are installed
         name_string = 'name: {}'.format(user_environment) # The name of the newly created environment
@@ -103,8 +112,25 @@ if sys.platform == "linux" or sys.platform == "linux2": # Execute this if the in
 
 
 elif sys.platform == "darwin": # Execute this instead if the installation platform is MacOS
-    subprocess.run('/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"', shell = True)
-    subprocess.run('brew install wget', shell = True)
+    
+    subprocess.run('/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"', shell = True)
+    subprocess.run("""(echo; echo 'eval "$(/usr/local/bin/brew shellenv)"') >> /Users/mahmoud/.zprofile""", shell = True)
+    subprocess.run('eval "$(/usr/local/bin/brew shellenv)"', shell = True)
+
+    subprocess.run('python -m pip install -U py-cpuinfo', shell = True)
+
+    import cpuinfo
+    cpu_brand = cpuinfo.get_cpu_info()['brand_raw']
+
+    if "Apple" in cpu_brand:
+        subprocess.run('arch -arm64 brew upgrade', shell = True)
+        subprocess.run('arch -arm64 brew install wget', shell = True)
+        subprocess.run('arch -arm64 brew install readline', shell = True)
+    else:
+        subprocess.run('brew upgrade', shell = True)
+        subprocess.run('brew install wget', shell = True)
+        subprocess.run('brew install readline', shell = True)    
+
     shutil.copy('{}/chipap_env_macos.yml'.format(sys.path[0]), '{}/chipap_{}.yml'.format(sys.path[0], user_environment)) # Copy paste the provided chipap_env_macos.yml file
     with open('{}/chipap_{}.yml'.format(sys.path[0], user_environment), 'r') as original_yml: yml_contents = original_yml.readlines() # Read the copy pasted file contents as list of lines
 
@@ -118,11 +144,25 @@ elif sys.platform == "darwin": # Execute this instead if the installation platfo
 
 
 if user_answer.lower() == 'y': # Execute this if user is installing ChIP-AP in a newly created environment
-    subprocess.run('conda env create -f {}/chipap_{}.yml'.format(sys.path[0], user_environment), shell = True)
+    if sys.platform == "linux" or sys.platform == "linux2":
+        subprocess.run('conda env create -f {}/chipap_{}.yml'.format(sys.path[0], user_environment), shell = True)
+    if sys.platform == "darwin":
+        subprocess.run('conda env create -f {}/chipap_{}.yml --platform osx-64'.format(sys.path[0], user_environment), shell = True)
+        subprocess.run('conda config --env --name {} --set subdir osx-64'.format(sys.path[0], user_environment), shell = True)
+        subprocess.run('CONDA_PREFIX={} conda config --set subdir osx-64'.format(chipap_env_dir), shell = True)  
 
-if user_answer.lower() == 'n': # Execute this if user is installing ChIP-AP in the base environment (where Anaconda 3 is installed)
+if user_answer.lower() == 'n': # Execute this if user is installing ChIP-AP in the base environment (where Anaconda / Miniconda / Miniforge is installed)
     subprocess.run('conda env update -f {}/chipap_{}.yml'.format(sys.path[0], user_environment), shell = True)
 
+
+# Force reinstall java-jdk to prevent "java: symbol lookup error: java: undefined symbol: JLI_StringDup"
+subprocess.run('conda install -n {} --force-reinstall -y java-jdk'.format(user_environment), shell = True)
+
+# Clean-up of residual files
+if os.path.isfile('{}/chipap_{}.yml'.format(sys.path[0], user_environment)):
+    os.remove('{}/chipap_{}.yml'.format(sys.path[0], user_environment))
+
+    
 subprocess.run('chmod +x {}/chipap_scripts/*'.format(sys.path[0]), shell = True) # Mark all scripts in folder "chipap_scripts" as executable
 
 subprocess.run('chmod +x {}/homer_genome_update.sh'.format(sys.path[0]), shell = True) # Mark the script "homer_genome_update.sh" as executable
@@ -183,7 +223,7 @@ if sys.platform == "linux" or sys.platform == "linux2":  # Execute this instead 
 elif sys.platform == "darwin":  # Execute this instead if the installation platform is MacOS
     subprocess.run('cp ./gem_macOS.zip {}/'.format(chipap_env_dir), shell = True)
     # shutil.copy('./gem_macOS.zip'.format("./",chipap_env_dir))
-    subprocess.run('unzip -o {}/gem_macOS.zip'.format(chipap_env_dir), shell = True)
+    subprocess.run('unzip gem_macOS.zip -d {}'.format(caras_env_dir), shell = True)
 
     if os.path.isfile('~/.bash_profile'): # If the computer already has the .bash_profile file
         print (".bash_profile exist") # Notify the user
